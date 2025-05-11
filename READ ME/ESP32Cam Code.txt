@@ -1,0 +1,212 @@
+#include "esp_camera.h"
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <LiquidCrystal_I2C.h>
+#include <ArduinoJson.h>
+#include <Wire.h>
+
+// ——— USER CONFIG ———
+const char* ssid             = "YOUR_SSID";
+const char* password         = "YOUR_PASS";
+const char* serverUrlUpload  = "http://YOUR_SERVER_DOMAIN/sams/api/logAttendance";  // POST frames
+const char* serverUrlCheck   = "http://YOUR_SERVER_DOMAIN/sams/api/activeClassSessions"; // GET active sessions
+const char* trackerId        = "01";
+
+// Pins for mode buttons & battery ADC
+const int BTN_IN    = 14;
+const int BTN_OUT   = 27;
+const int BAT_ADC   = 35;
+
+// I²C LCD
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+// Timing constants
+enum Mode { UNSEL, TIME_IN, TIME_OUT };
+const uint32_t RESTART_INTERVAL = 4UL * 3600UL * 1000UL;  // 4 h
+const uint32_t MODE_TIMEOUT     = 10000UL;               // 10 s without success
+const uint32_t MSG_HOLD         = 3000UL;                // 3 s per message
+const uint32_t BACKLIGHT_TIMEOUT= 15000UL;               // 15 s idle
+
+Mode     mode        = UNSEL;
+uint32_t modeTimer   = 0;
+uint32_t lastRestart = 0;
+uint32_t lastActivity= 0;
+bool     backlightOn = true;
+
+// ——— HELPERS ———
+void showAndHold(const String &l1, const String &l2 = "", uint32_t ms = MSG_HOLD) {
+  if (!backlightOn) { lcd.backlight(); backlightOn = true; }
+  lastActivity = millis();
+  lcd.clear(); lcd.setCursor(0,0); lcd.print(l1);
+  if (l2.length()) { lcd.setCursor(0,1); lcd.print(l2); }
+  else { lcd.setCursor(0,1); lcd.print("Tracker: " + String(trackerId)); }
+  if (ms) delay(ms);
+}
+
+void displayWaiting() {
+  if (!backlightOn) { lcd.backlight(); backlightOn = true; }
+  lastActivity = millis();
+  lcd.clear(); lcd.setCursor(0,0);
+  lcd.print("Mode: "); lcd.print(mode==TIME_IN?"IN":"OUT");
+  lcd.setCursor(0,1); lcd.print("Scanning...");
+}
+
+void ensureWiFi() {
+  if (WiFi.status() == WL_CONNECTED) return;
+  WiFi.disconnect(); WiFi.begin(ssid, password);
+  uint32_t t0 = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - t0 < 5000) delay(200);
+}
+
+float readBattery() {
+  int raw = analogRead(BAT_ADC);
+  float v_adc = raw / 4095.0 * 3.3;
+  return v_adc * 2.0;
+}
+
+// Check if tracker has active sessions
+bool checkTrackerActive() {
+  ensureWiFi();
+  HTTPClient http;
+  String url = String(serverUrlCheck) + "?tracker_id=" + trackerId;
+  http.begin(url); http.addHeader("Connection","close");
+  int code = http.GET();
+  bool active = false;
+  if (code == 200) {
+    String resp = http.getString();
+    StaticJsonDocument<200> doc;
+    if (deserializeJson(doc, resp) == DeserializationError::Ok) {
+      active = doc["active"] | false;
+    }
+  }
+  http.end();
+  return active;
+}
+
+void setup() {
+  Serial.begin(115200);
+  Serial.printf("Tracker ID: %s\n", trackerId);
+
+  Wire.begin(21,22);
+  pinMode(BTN_IN,  INPUT_PULLUP);
+  pinMode(BTN_OUT, INPUT_PULLUP);
+  analogReadResolution(12);
+
+  lcd.init(); lcd.backlight();
+  showAndHold("Initializing...","", 1000);
+
+  // Camera init for AI Thinker ESP32-CAM
+  camera_config_t cfg;
+  cfg.ledc_channel = LEDC_CHANNEL_0; cfg.ledc_timer = LEDC_TIMER_0;
+  cfg.pin_d0 = 5; cfg.pin_d1 = 18; cfg.pin_d2 = 19; cfg.pin_d3 = 21;
+  cfg.pin_d4 = 36; cfg.pin_d5 = 39; cfg.pin_d6 = 34; cfg.pin_d7 = 35;
+  cfg.pin_xclk = 0; cfg.pin_pclk = 22; cfg.pin_vsync = 25; cfg.pin_href = 23;
+  cfg.pin_sscb_sda = 26; cfg.pin_sscb_scl = 27; cfg.pin_pwdn = 32; cfg.pin_reset = -1;
+  cfg.xclk_freq_hz = 20000000; cfg.pixel_format = PIXFORMAT_JPEG;
+  cfg.frame_size = FRAMESIZE_QVGA; cfg.jpeg_quality = 12; cfg.fb_count = 1;
+
+  if (esp_camera_init(&cfg) != ESP_OK) {
+    showAndHold("Camera init FAIL","", 0);
+    while(true) delay(1000);
+  }
+
+  lastRestart = millis();
+  lastActivity= millis();
+}
+
+void loop() {
+  uint32_t now = millis();
+
+  // 1) Reboot periodically
+  if (now - lastRestart >= RESTART_INTERVAL) {
+    ESP.restart();
+  }
+
+  // 2) Auto-backlight off
+  if (backlightOn && now - lastActivity >= BACKLIGHT_TIMEOUT) {
+    lcd.noBacklight(); backlightOn = false;
+  }
+
+  // 3) Check active sessions on every loop
+  bool active = checkTrackerActive();
+  if (!active) {
+    mode = UNSEL;
+    showAndHold("No Active Class","", MSG_HOLD);
+    return;
+  }
+
+  // 4) If unselected, show default prompt
+  if (mode == UNSEL) {
+    showAndHold("Select: In / Out","", 0);
+  }
+
+  // 5) Button overrides (always listened)
+  if (digitalRead(BTN_IN) == LOW) {
+    delay(50);
+    mode = TIME_IN; modeTimer = now;
+    showAndHold("Mode: Time IN","Scanning...");
+  }
+  if (digitalRead(BTN_OUT) == LOW) {
+    delay(50);
+    mode = TIME_OUT; modeTimer = now;
+    showAndHold("Mode: Time OUT","Scanning...");
+  }
+
+  // 6) If still unselected after prompt, wait
+  if (mode == UNSEL) {
+    ensureWiFi(); return;
+  }
+
+  // 7) Mode timeout
+  if (now - modeTimer >= MODE_TIMEOUT) {
+    mode = UNSEL;
+    showAndHold("Timeout → Reset","Select: In/Out");
+    return;
+  }
+
+  // 8) Capture & POST frame
+  ensureWiFi();
+  camera_fb_t *fb = esp_camera_fb_get();
+  if (!fb) { delay(500); return; }
+
+  String action = (mode==TIME_IN) ? "time_in" : "time_out";
+  String url = String(serverUrlUpload)
+             + "?tracker_id=" + trackerId
+             + "&timestamp="  + String(now)
+             + "&action="     + action;
+
+  HTTPClient http;
+  http.begin(url);
+  http.addHeader("Content-Type","image/jpeg");
+  http.addHeader("Connection","close");
+  int code = http.POST(fb->buf, fb->len);
+  String resp = http.getString();
+  http.end();
+  esp_camera_fb_return(fb);
+
+  Serial.printf("HTTP %d → %s\n", code, resp.c_str());
+
+  // 9) Parse JSON response
+  StaticJsonDocument<200> doc;
+  if (deserializeJson(doc, resp) != DeserializationError::Ok) {
+    showAndHold("Invalid JSON","Resetting...");
+    mode = UNSEL;
+    showAndHold("Select: In/Out","", 0);
+    return;
+  }
+  const char* status  = doc["status"] | "fail";
+  const char* message = doc["message"]| "No message";
+
+  // 10) Handle status
+  if (strcmp(status, "success") == 0) {
+    modeTimer = now;
+    showAndHold(message);
+    displayWaiting();
+  } else {
+    showAndHold(message);
+    mode = UNSEL;
+    showAndHold("Select: In/Out","", 0);
+  }
+
+  delay(200);
+}
