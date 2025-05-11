@@ -1,0 +1,672 @@
+Comprehensive Prompt Builder Guide for Student Attendance Management System UI Design
+This guide provides a detailed blueprint for designing a user interface (UI) for a Student Attendance Management System using CodeIgniter 4 (CI4). The system supports three user roles—students, teachers, and administrators—with role-specific portals, a branded homepage, and authentication pages. It leverages the provided model code, sample UI structure, and the detailed layout guide, incorporating modern UI practices, theming, and specific requirements such as a dark blue color scheme, logo placement, multiple attendance visualizations, leave request workflows with datetime ranges, daily/weekly/monthly schedules with room and teacher details, bulk enrollment logic, notification popups, and DataTable features with pagination and sorting.
+
+System Overview
+The website is structured with the following URL paths and controllers:
+
+"/": Managed by HomeController, showcasing project details and creators.
+"/auth": Managed by AuthController, handling login, registration, and password reset.
+"/student": Managed by StudentController, for student functionalities.
+"/teacher": Managed by TeacherController, for teacher tasks.
+"/admin": Managed by AdminController, for administrative operations, including bulk enrollment.
+Clarifications Incorporated
+Homepage: Displays project details and creators, with a call-to-action for login/registration.
+Branding: Dark blue primary color (#1E3A8A), logo (logo.png) placed in navbar and footer.
+Navigation: Role-specific navbar links as per the layout guide (e.g., Student: Dashboard, My Classes, Attendance Logs, Schedule, Profile).
+Attendance Visualizations: Basic Chart.js charts (pie for status, line for trends, bar for summaries).
+Leave Requests: Students create requests with datetime ranges; teachers/admins approve/reject via AttendanceLeaveModel.
+Class Schedules: Daily, weekly, monthly views with room and teacher details using ScheduleModel and ClassSessionModel.
+Bulk Enrollment: Admin uploads CSV or manually adds students under the Student Assignments tab, with flexible CSV format (e.g., student_id column).
+Notifications: Popup for unread notifications using NotificationsModel, accessible across portals.
+DataTables: Include global search, column sorting, pagination, and page-size selectors for admin CRUD operations.
+Dark Mode: Optional theming feature for user preference.
+No External Integrations: Standalone system.
+Security Measures: Not implemented yet.
+Time Zones/Languages: Not supported.
+Gaps and Enhancements
+Based on the provided models and layout guide, the following gaps and enhancements are addressed:
+
+Controller Logic: Missing controller methods for handling notifications, bulk enrollment, and schedule toggling.
+View Components: Need for reusable components (e.g., dynamic forms, modals, DataTables) to reduce redundancy.
+Notifications: Lack of UI integration for NotificationsModel (now added as a popup).
+Schedule Details: Models support room and teacher data, but views need explicit inclusion.
+CRUD Operations: Admin portal requires robust DataTable and modal interactions for all models.
+Error Handling: Standardized error messages and validation feedback are needed.
+Profile Management: Profile views need consistent modal-based editing across roles.
+High-Level Plan for Controllers and Views
+Controllers
+Below is a high-level plan for each controller, outlining key methods and their responsibilities.
+
+HomeController
+index(): Renders the homepage with project details and creators.
+Data Needs: Static content (configurable via a settings model if needed).
+Output: Views/home.php.
+AuthController
+login(): Handles login form submission, validates credentials using UserModel::authenticateUserByPassword, and redirects based on role.
+register(): Processes registration form, creates user via UserModel::createUser.
+forgotPassword(): Displays and processes password reset form, updates via UserModel::resetPassword.
+logout(): Clears session and redirects to homepage.
+Data Needs: UserModel for authentication and user creation.
+Outputs: Views/auth/login.php, Views/auth/register.php, Views/auth/forgot_password.php.
+StudentController
+index(): Displays dashboard with attendance summary, upcoming classes, and leave request form.
+classes(): Lists enrolled classes with clickable tiles to class details.
+classDetail($classId): Shows class subview with tabs (Attendance, Sessions, Leave Requests, History).
+attendance(): Displays attendance logs with filters (date range, class, status).
+schedule(): Renders calendar with toggleable views (day/week/month).
+profile(): Shows editable profile form in a modal.
+leaveRequests(): Handles leave request creation and listing.
+Data Needs: AttendanceModel, ClassModel, ClassSessionModel, ScheduleModel, AttendanceLeaveModel, UserModel, NotificationsModel.
+Outputs: Views/student/dashboard.php, Views/student/classes.php, Views/student/attendance.php, Views/student/schedule.php, Views/student/profile.php, Views/student/leave_requests.php.
+TeacherController
+index(): Shows dashboard with today’s sessions, pending leave requests, and alerts.
+classes(): Lists assigned classes with details subview.
+classDetail($classId): Displays tabs (Roster, Sessions, Attendance).
+leaveRequests(): Lists leave requests with approve/reject actions.
+schedule(): Shows teaching schedule (day/week views).
+reports(): Generates attendance reports with export options.
+profile(): Editable profile modal.
+Data Needs: TeacherAssignmentModel, ClassModel, ClassSessionModel, AttendanceModel, AttendanceLeaveModel, ScheduleModel, UserModel, NotificationsModel.
+Outputs: Views/teacher/dashboard.php, Views/teacher/classes.php, Views/teacher/leave_requests.php, Views/teacher/schedule.php, Views/teacher/reports.php, Views/teacher/profile.php.
+AdminController
+index(): Displays dashboard with metric tiles and recent activity.
+users(): CRUD for users via DataTable and modals.
+students(): CRUD for students (subset of users).
+teachers(): CRUD for teachers.
+classes(): CRUD for classes.
+subjects(): CRUD for subjects.
+enrollmentTerms(): CRUD for enrollment terms.
+studentAssignments(): Manages student enrollments (individual and bulk).
+teacherAssignments(): Manages teacher assignments.
+rooms(): CRUD for rooms.
+trackers(): CRUD for trackers.
+notifications(): Manages notifications with read/unread status.
+classSessions(): Manages class sessions with settings.
+classSessionSettings(): CRUD for session settings.
+attendance(): Manages attendance records.
+leaveRequests(): Approves/rejects leave requests.
+schedule(): Manages schedules.
+profileSettings(): Editable admin profile.
+Data Needs: All models (UserModel, ClassModel, SubjectModel, EnrollmentTermModel, StudentAssignmentModel, TeacherAssignmentModel, RoomModel, TrackerModel, NotificationsModel, ClassSessionModel, ClassSessionSettingsModel, AttendanceModel, AttendanceLeaveModel, ScheduleModel).
+Outputs: Corresponding admin views (e.g., Views/admin/dashboard.php, Views/admin/users.php, Views/admin/student_assignments.php).
+Views
+Views are organized by role, with shared layouts and components for consistency.
+
+Shared Components
+layouts/main.php: Base layout with navbar, sidebar (role-specific), and footer.
+layouts/sidebar_student.php, sidebar_teacher.php, sidebar_admin.php: Role-specific sidebar menus.
+components/datatable.php: Reusable DataTable with search, sorting, pagination, and bulk actions.
+components/modal.php: Generic modal for CRUD and confirmations.
+components/form.php: Dynamic form generator based on model allowedFields.
+components/notification_popup.php: Popup for unread notifications.
+View Structure
+auth/: Login, register, forgot password pages.
+student/: Dashboard, classes, attendance, schedule, profile, leave requests.
+teacher/: Dashboard, classes, leave requests, schedule, reports, profile.
+admin/: Dashboard, CRUD pages for all models, notifications, class sessions, attendance, leave requests, schedule, profile settings.
+Directory Structure
+text
+
+Copy
+app/
+├── Controllers/
+│   ├── HomeController.php
+│   ├── AuthController.php
+│   ├── StudentController.php
+│   ├── TeacherController.php
+│   └── AdminController.php
+├── Views/
+│   ├── auth/
+│   │   ├── login.php
+│   │   ├── register.php
+│   │   └── forgot_password.php
+│   ├── student/
+│   │   ├── dashboard.php
+│   │   ├── classes.php
+│   │   ├── class_detail.php
+│   │   ├── attendance.php
+│   │   ├── schedule.php
+│   │   ├── profile.php
+│   │   └── leave_requests.php
+│   ├── teacher/
+│   │   ├── dashboard.php
+│   │   ├── classes.php
+│   │   ├── class_detail.php
+│   │   ├── leave_requests.php
+│   │   ├── schedule.php
+│   │   ├── reports.php
+│   │   └── profile.php
+│   ├── admin/
+│   │   ├── dashboard.php
+│   │   ├── users.php
+│   │   ├── students.php
+│   │   ├── teachers.php
+│   │   ├── classes.php
+│   │   ├── subjects.php
+│   │   ├── enrollment_terms.php
+│   │   ├── student_assignments.php
+│   │   ├── teacher_assignments.php
+│   │   ├── rooms.php
+│   │   ├── trackers.php
+│   │   ├── notifications.php
+│   │   ├── class_sessions.php
+│   │   ├── class_session_settings.php
+│   │   ├── attendance.php
+│   │   ├── leave_requests.php
+│   │   ├── schedule.php
+│   │   └── profile_settings.php
+│   ├── layouts/
+│   │   ├── main.php
+│   │   ├── sidebar_student.php
+│   │   ├── sidebar_teacher.php
+│   │   └── sidebar_admin.php
+│   ├── components/
+│   │   ├── datatable.php
+│   │   ├── modal.php
+│   │   ├── form.php
+│   │   └── notification_popup.php
+│   └── home.php
+public/
+├── assets/
+│   ├── css/
+│   │   └── tailwind.css
+│   ├── js/
+│   │   ├── chart.js
+│   │   ├── fullcalendar.js
+│   │   └── datatables.js
+│   └── img/
+│       └── logo.png
+Theming and UI Practices
+CSS Framework: Tailwind CSS for responsive, utility-first styling.
+Color Scheme:
+Primary: Dark blue (#1E3A8A)
+Secondary: Light gray (#F3F4F6)
+Success: Green (#10B981)
+Error: Red (#EF4444)
+Typography: Roboto font via Google Fonts.
+Navigation:
+Navbar: Role-specific links (e.g., Student: Dashboard, My Classes, Attendance Logs, Schedule, Profile).
+Sidebar: Collapsible, role-specific menu items.
+Dark Mode: Toggleable via user profile settings, using Tailwind’s dark mode classes.
+Responsiveness: Tailwind responsive classes (sm:, md:, lg:).
+Accessibility: ARIA labels, keyboard navigation, WCAG compliance.
+Branding: Logo in navbar (left, 40px height) and footer.
+UI Components
+Forms: Dynamic forms for CRUD, leave requests, and profiles.
+DataTables: Search, sort, paginate, bulk actions (using DataTables.js).
+Tiles: Card-based UI for dashboards and lists.
+Modals: For CRUD, confirmations, and profile editing.
+Charts: Pie (status), line (trends), bar (summaries) via Chart.js.
+Calendars: Daily, weekly, monthly views via FullCalendar.
+Notification Popup: Displays unread notifications with mark-as-read action.
+Pseudocode for Key Views
+Main Layout (layouts/main.php)
+php
+
+Copy
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Student Attendance System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <link href="/assets/css/tailwind.css" rel="stylesheet">
+    <script src="/assets/js/chart.js"></script>
+    <script src="/assets/js/fullcalendar.js"></script>
+    <script src="/assets/js/datatables.js"></script>
+</head>
+<body class="font-roboto bg-gray-100" id="theme" data-theme="light">
+    <nav class="bg-blue-900 text-white p-4 flex justify-between items-center">
+        <div class="flex items-center">
+            <img src="/assets/img/logo.png" alt="Logo" class="h-10 mr-2">
+            <span class="text-lg font-bold">Attendance System</span>
+        </div>
+        <div class="space-x-4">
+            <?php if (session()->get('role')): ?>
+                <?php switch (session()->get('role')): ?>
+                    <?php case 'student': ?>
+                        <a href="/student" class="hover:underline">Dashboard</a>
+                        <a href="/student/classes" class="hover:underline">My Classes</a>
+                        <a href="/student/attendance" class="hover:underline">Attendance Logs</a>
+                        <a href="/student/schedule" class="hover:underline">Schedule</a>
+                        <a href="/student/profile" class="hover:underline">Profile</a>
+                    <?php break; ?>
+                    <?php case 'teacher': ?>
+                        <a href="/teacher" class="hover:underline">Dashboard</a>
+                        <a href="/teacher/classes" class="hover:underline">My Classes</a>
+                        <a href="/teacher/leave_requests" class="hover:underline">Leave Requests</a>
+                        <a href="/teacher/schedule" class="hover:underline">Schedule</a>
+                        <a href="/teacher/reports" class="hover:underline">Reports</a>
+                        <a href="/teacher/profile" class="hover:underline">Profile</a>
+                    <?php break; ?>
+                    <?php case 'admin': ?>
+                        <a href="/admin" class="hover:underline">Dashboard</a>
+                        <a href="/admin/users" class="hover:underline">Users</a>
+                        <a href="/admin/classes" class="hover:underline">Classes</a>
+                        <a href="/admin/student_assignments" class="hover:underline">Student Assignments</a>
+                        <a href="/admin/notifications" class="hover:underline">Notifications</a>
+                    <?php break; ?>
+                <?php endswitch; ?>
+                <a href="/auth/logout" class="hover:underline">Logout</a>
+            <?php else: ?>
+                <a href="/" class="hover:underline">Home</a>
+                <a href="/auth/login" class="hover:underline">Login</a>
+                <a href="/auth/register" class="hover:underline">Register</a>
+            <?php endif; ?>
+        </div>
+    </nav>
+    <div class="flex min-h-screen">
+        <?php if (session()->get('role')): ?>
+            <?php echo view('layouts/sidebar_' . session()->get('role')); ?>
+        <?php endif; ?>
+        <main class="flex-1 p-6">
+            <?php echo $this->renderSection('content'); ?>
+        </main>
+    </div>
+    <?php if (session()->get('role')): ?>
+        <?php echo view('components/notification_popup', ['notifications' => model('NotificationsModel')->getUnreadNotifications(session()->get('user_id'))]); ?>
+    <?php endif; ?>
+    <footer class="bg-blue-900 text-white p-4 text-center">
+        <img src="/assets/img/logo.png" alt="Logo" class="h-6 inline-block mr-2">
+        <span>© 2025 Attendance System</span>
+    </footer>
+    <script>
+        function toggleTheme() {
+            const body = document.getElementById('theme');
+            body.dataset.theme = body.dataset.theme === 'light' ? 'dark' : 'light';
+        }
+    </script>
+</body>
+</html>
+Notification Popup (components/notification_popup.php)
+php
+
+Copy
+<div class="fixed top-4 right-4 bg-white shadow-lg rounded-lg p-4 w-80 hidden" id="notification-popup">
+    <h3 class="text-lg font-semibold mb-2">Notifications</h3>
+    <?php foreach ($notifications as $notification): ?>
+        <div class="border-b py-2">
+            <p><?php echo esc($notification['message']); ?></p>
+            <a href="/notifications/mark_read/<?php echo $notification['notif_id']; ?>" class="text-blue-900 hover:underline">Mark as Read</a>
+        </div>
+    <?php endforeach; ?>
+    <button onclick="togglePopup()"evolution of education with seamless attendance tracking." />
+        <a href="/auth/login" class="mt-4 inline-block bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Get Started</a>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-4">Project Details</h2>
+            <p>Streamlines attendance tracking, class management, and leave requests for educational institutions.</p>
+        </div>
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-4">Creators</h2>
+            <p>Developed by xAI, a team passionate about advancing educational technology.</p>
+        </div>
+    </div>
+<?php $this->endSection(); ?>
+Student Dashboard (student/dashboard.php)
+php
+
+Copy
+<?php $this->extend('layouts/main'); ?>
+<?php $this->section('content'); ?>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-4">Today’s Classes</h2>
+            <p class="text-2xl"><?php echo count($todaySessions); ?> Sessions</p>
+            <div class="overflow-x-auto mt-4">
+                <?php foreach (array_slice($todaySessions, 0, 2) as $session): ?>
+                    <div class="border-b py-2">
+                        <p><?php echo esc($session['class_session_name']); ?> @ <?php echo esc($session['open_datetime']); ?></p>
+                        <p class="text-sm text-gray-600"><?php echo esc($session['room_name']); ?> - <?php echo esc($session['teacher_name']); ?></p>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-4">Attendance Rate</h2>
+            <p class="text-3xl text-green-600"><?php echo round($attendanceRate, 1); ?>%</p>
+            <canvas id="attendanceSparkline" class="mt-4"></canvas>
+            <script>
+                new Chart(document.getElementById('attendanceSparkline'), {
+                    type: 'line',
+                    data: {
+                        labels: <?php echo json_encode($pastWeekDates); ?>,
+                        datasets: [{ data: <?php echo json_encode($pastWeekAttendance); ?>, borderColor: '#10B981', fill: false }]
+                    },
+                    options: { scales: { x: { display: false }, y: { display: false } } }
+                });
+            </script>
+        </div>
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-4">Notifications</h2>
+            <p class="text-2xl"><?php echo count($notifications); ?> Unread</p>
+            <button onclick="togglePopup()" class="mt-4 bg-blue-900 text-white px-4 py-2 rounded">View Notifications</button>
+        </div>
+    </div>
+<?php $this->endSection(); ?>
+Student Class Detail (student/class_detail.php)
+php
+
+Copy
+<?php $this->extend('layouts/main'); ?>
+<?php $this->section('content'); ?>
+    <div class="bg-white p-6 rounded-lg shadow-md">
+        <h2 class="text-2xl font-semibold mb-4"><?php echo esc($class['class_name']); ?> - <?php echo esc($class['subject_name']); ?></h2>
+        <p class="text-gray-600 mb-4">Teacher: <?php echo esc($class['teacher_name']); ?> | Section: <?php echo esc($class['section']); ?></p>
+        <div class="flex space-x-4 mb-4">
+            <button onclick="showTab('attendance')" class="bg-blue-900 text-white px-4 py-2 rounded">Attendance</button>
+            <button onclick="showTab('sessions')" class="bg-blue-900 text-white px-4 py-2 rounded">Sessions</button>
+            <button onclick="showTab('leave_requests')" class="bg-blue-900 text-white px-4 py-2 rounded">Leave Requests</button>
+            <button onclick="showTab('history')" class="bg-blue-900 text-white px-4 py-2 rounded">History</button>
+        </div>
+        <div id="attendance" class="tab-content">
+            <canvas id="attendancePieChart" class="mb-4"></canvas>
+            <script>
+                new Chart(document.getElementById('attendancePieChart'), {
+                    type: 'pie',
+                    data: {
+                        labels: ['Present', 'Absent', 'Late'],
+                        datasets: [{ data: [<?php echo $presentCount; ?>, <?php echo $absentCount; ?>, <?php echo $lateCount; ?>], backgroundColor: ['#10B981', '#EF4444', '#F59E0B'] }]
+                    }
+                });
+            </script>
+            <a href="/student/attendance" class="text-blue-900 hover:underline">View All History</a>
+        </div>
+        <div id="sessions" class="tab-content hidden">
+            <?php foreach ($sessions as $session): ?>
+                <div class="border p-4 mb-2 rounded">
+                    <p><?php echo esc($session['class_session_name']); ?> - <?php echo esc($session['open_datetime']); ?></p>
+                    <p class="text-sm text-gray-600"><?php echo esc($session['room_name']); ?> - Status: <?php echo esc($session['status']); ?></p>
+                    <?php if ($session['status'] === 'open'): ?>
+                        <a href="/student/sessions/join/<?php echo $session['class_session_id']; ?>" class="text-green-600 hover:underline">Join</a>
+                    <?php else: ?>
+                        <a href="/student/sessions/<?php echo $session['class_session_id']; ?>" class="text-blue-900 hover:underline">Details</a>
+                    <?php endif; ?>
+                </div>
+            <?php endforeach; ?>
+        </div>
+        <div id="leave_requests" class="tab-content hidden">
+            <button onclick="openModal('new_leave_request')" class="bg-blue-900 text-white px-4 py-2 rounded mb-4">New Request</button>
+            <?php foreach ($leaveRequests as $request): ?>
+                <div class="border p-4 mb-2 rounded">
+                    <p>From: <?php echo esc($request['datetimestamp_created']); ?> To: <?php echo esc($request['datetimestamp_resolved']); ?></p>
+                    <p>Status: <?php echo esc($request['status']); ?></p>
+                    <a href="/student/leave_requests/edit/<?php echo $request['attendance_leave_id']; ?>" class="text-blue-900 hover:underline">Edit</a>
+                    <a href="/student/leave_requests/cancel/<?php echo $request['attendance_leave_id']; ?>" class="text-red-600 hover:underline">Cancel</a>
+                </div>
+            <?php endforeach; ?>
+        </div>
+        <div id="history" class="tab-content hidden">
+            <select class="p-2 border rounded mb-4">
+                <option>All</option>
+                <option>Present</option>
+                <option>Late</option>
+                <option>Absent</option>
+            </select>
+            <table class="w-full">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Session</th>
+                        <th>Status</th>
+                        <th>Remarks</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($attendanceHistory as $record): ?>
+                        <tr>
+                            <td><?php echo esc($record['date']); ?></td>
+                            <td><?php echo esc($record['session_name']); ?></td>
+                            <td><?php echo esc($record['status']); ?></td>
+                            <td><?php echo esc($record['remarks']); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php echo view('components/modal', [
+            'id' => 'new_leave_request',
+            'title' => 'New Leave Request',
+            'form' => [
+                'action' => '/student/leave_requests',
+                'fields' => [
+                    ['name' => 'letter', 'type' => 'textarea', 'label' => 'Reason', 'required' => true],
+                    ['name' => 'date_start', 'type' => 'datetime-local', 'label' => 'Start Date', 'required' => true],
+                    ['name' => 'date_end', 'type' => 'datetime-local', 'label' => 'End Date', 'required' => true]
+                ]
+            ]
+        ]); ?>
+        <script>
+            function showTab(tab) {
+                document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+                document.getElementById(tab).classList.remove('hidden');
+            }
+            function openModal(id) {
+                document.getElementById(id).classList.remove('hidden');
+            }
+        </script>
+    </div>
+<?php $this->endSection(); ?>
+Teacher Dashboard (teacher/dashboard.php)
+php
+
+Copy
+<?php $this->extend('layouts/main'); ?>
+<?php $this->section('content'); ?>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-4">Today’s Sessions</h2>
+            <?php foreach ($todaySessions as $session): ?>
+                <div class="border p-4 mb-2 rounded">
+                    <p><?php echo esc($session['class_session_name']); ?> @ <?php echo esc($session['open_datetime']); ?></p>
+                    <p class="text-sm text-gray-600"><?php echo esc($session['room_name']); ?> - <?php echo esc($session['class_name']); ?></p>
+                    <?php if ($session['status'] === 'pending'): ?>
+                        <a href="/teacher/sessions/start/<?php echo $session['class_session_id']; ?>" class="text-green-600 hover:underline">Start</a>
+                    <?php else: ?>
+                        <a href="/teacher/sessions/<?php echo $session['class_session_id']; ?>" class="text-blue-900 hover:underline">Enter</a>
+                    <?php endif; ?>
+                    <a href="/teacher/sessions/delete/<?php echo $session['class_session_id']; ?>" class="text-red-600 hover:underline" onclick="openModal('confirm_delete_<?php echo $session['class_session_id']; ?>')">Delete</a>
+                    <?php echo view('components/modal', [
+                        'id' => 'confirm_delete_' . $session['class_session_id'],
+                        'title' => 'Confirm Delete',
+                        'content' => 'Are you sure you want to delete this session?',
+                        'action' => '/teacher/sessions/delete/' . $session['class_session_id']
+                    ]); ?>
+                </div>
+            <?php endforeach; ?>
+        </div>
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-4">Alerts</h2>
+            <div class="border p-4 mb-2">
+                <p>Pending Leave Requests: <?php echo count($pendingLeaves); ?></p>
+                <a href="/teacher/leave_requests" class="text-blue-900 hover:underline">View</a>
+            </div>
+            <div class="border p-4">
+                <p>Pending Sessions: <?php echo count($pendingSessions); ?></p>
+                <a href="/teacher/classes" class="text-blue-900 hover:underline">View</a>
+            </div>
+        </div>
+    </div>
+<?php $this->endSection(); ?>
+Admin Student Assignments (admin/student_assignments.php)
+php
+
+Copy
+<?php $this->extend('layouts/main'); ?>
+<?php $this->section('content'); ?>
+    <div class="bg-white p-6 rounded-lg shadow-md">
+        <h2 class="text-xl font-semibold mb-4">Student Assignments</h2>
+        <div class="flex space-x-4 mb-4">
+            <button onclick="showTab('individual')" class="bg-blue-900 text-white px-4 py-2 rounded">Individual</button>
+            <button onclick="showTab('bulk')" class="bg-blue-900 text-white px-4 py-2 rounded">Bulk</button>
+        </div>
+        <div id="individual" class="tab-content">
+            <?php echo view('components/form', [
+                'action' => '/admin/student_assignments/individual',
+                'fields' => [
+                    ['name' => 'student_id', 'type' => 'text', 'label' => 'Student ID', 'required' => true],
+                    ['name' => 'class_id', 'type' => 'select', 'label' => 'Class', 'options' => $classes, 'required' => true]
+                ]
+            ]); ?>
+        </div>
+        <div id="bulk" class="tab-content hidden">
+            <form action="/admin/student_assignments/bulk" method="post" enctype="multipart/form-data">
+                <div class="mb-4">
+                    <label class="block text-gray-700">Class</label>
+                    <select name="class_id" class="w-full p-2 border rounded" required>
+                        <?php foreach ($classes as $class): ?>
+                            <option value="<?php echo $class['class_id']; ?>"><?php echo esc($class['class_name']); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700">Upload CSV (student_id)</label>
+                    <input type="file" name="csv_file" accept=".csv" class="w-full p-2 border rounded" required>
+                </div>
+                <button type="submit" class="bg-blue-900 text-white p-2 rounded hover:bg-blue-800">Upload and Enroll</button>
+            </form>
+        </div>
+        <?php echo view('components/datatable', [
+            'columns' => ['ID', 'Student', 'Class', 'Term', 'Actions'],
+            'data' => $assignments,
+            'actions' => [
+                ['label' => 'Edit', 'url' => '/admin/student_assignments/edit/{id}'],
+                ['label' => 'Delete', 'url' => '/admin/student_assignments/delete/{id}', 'confirm' => true]
+            ]
+        ]); ?>
+        <script>
+            function showTab(tab) {
+                document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+                document.getElementById(tab).classList.remove('hidden');
+            }
+        </script>
+    </div>
+<?php $this->endSection(); ?>
+Shared DataTable Component (components/datatable.php)
+php
+
+Copy
+<div class="bg-white p-6 rounded-lg shadow-md">
+    <div class="mb-4">
+        <input type="text" id="search" class="w-full p-2 border rounded" placeholder="Search...">
+    </div>
+    <table class="w-full" id="datatable">
+        <thead>
+            <tr>
+                <?php foreach ($columns as $column): ?>
+                    <th class="p-2"><?php echo esc($column); ?></th>
+                <?php endforeach; ?>
+            </tr>
+        </thead>
+        <tbody>
+            <?php foreach ($data as $row): ?>
+                <tr>
+                    <?php foreach ($row as $key => $value): ?>
+                        <?php if (in_array($key, array_keys($row))): ?>
+                            <td class="p-2"><?php echo esc($value); ?></td>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+                    <td class="p-2">
+                        <?php foreach ($actions as $action): ?>
+                            <a href="<?php echo str_replace('{id}', $row['id'], $action['url']); ?>" 
+                               class="text-blue-900 hover:underline"
+                               <?php if (isset($action['confirm'])): ?>onclick="openModal('confirm_<?php echo $row['id']; ?>')"<?php endif; ?>>
+                                <?php echo esc($action['label']); ?>
+                            </a>
+                            <?php if (isset($action['confirm'])): ?>
+                                <?php echo view('components/modal', [
+                                    'id' => 'confirm_' . $row['id'],
+                                    'title' => 'Confirm ' . $action['label'],
+                                    'content' => 'Are you sure?',
+                                    'action' => str_replace('{id}', $row['id'], $action['url'])
+                                ]); ?>
+                            <?php endif; ?>
+                        <?php endforeach; ?>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+        </tbody>
+    </table>
+    <div class="mt-4 flex justify-between">
+        <select class="p-2 border rounded">
+            <option>10</option>
+            <option>25</option>
+            <option>50</option>
+        </select>
+        <div>
+            <button class="bg-gray-300 p-2 rounded">Previous</button>
+            <button class="bg-gray-300 p-2 rounded">Next</button>
+        </div>
+    </div>
+    <script>
+        $(document).ready(function() {
+            $('#datatable').DataTable({
+                searching: true,
+                ordering: true,
+                paging: true
+            });
+        });
+    </script>
+</div>
+Supporting Details
+Authentication: UserModel handles secure login and registration, with role-based redirects.
+Data Fetching: Controllers use model methods (e.g., ClassSessionModel::getSessionsByClass) to populate views.
+Validation: CI4 validation rules from models (e.g., AttendanceLeaveModel::$validationRules) ensure data integrity.
+Error Handling: Flash messages for success (session()->setFlashdata('success', 'Action completed')) and errors.
+Responsive Design: Tailwind classes for mobile, tablet, and desktop layouts.
+Accessibility: ARIA labels, focus management, and high-contrast options.
+Dark Mode: Toggle in profile settings, using Tailwind’s dark: classes.
+CSV Format: Bulk enrollment expects student_id column; errors logged for invalid IDs.
+Sample Controller Implementation
+php
+
+Copy
+// StudentController.php
+namespace App\Controllers;
+
+use App\Models\AttendanceModel;
+use App\Models\ClassSessionModel;
+use App\Models\AttendanceLeaveModel;
+use App\Models\NotificationsModel;
+
+class StudentController extends BaseController
+{
+    public function index()
+    {
+        $attendanceModel = new AttendanceModel();
+        $sessionModel = new ClassSessionModel();
+        $notificationModel = new NotificationsModel();
+
+        $data = [
+            'todaySessions' => $sessionModel->getSessionsByDateRange(date('Y-m-d'), date('Y-m-d')),
+            'attendanceRate' => $attendanceModel->calculateAttendancePercentage(session()->get('user_id'), $classId),
+            'pastWeekDates' => [], // Logic for past 7 days
+            'pastWeekAttendance' => [], // Logic for attendance data
+            'notifications' => $notificationModel->getUnreadNotifications(session()->get('user_id'))
+        ];
+        return view('student/dashboard', $data);
+    }
+
+    public function leaveRequests()
+    {
+        $leaveModel = new AttendanceLeaveModel();
+        if ($this->request->getMethod() === 'post') {
+            $data = [
+                'user_id' => session()->get('user_id'),
+                'letter' => $this->request->getPost('letter'),
+                'date_start' => $this->request->getPost('date_start'),
+                'date_end' => $this->request->getPost('date_end'),
+                'status' => 'pending'
+            ];
+            try {
+                $leaveModel->createLeave($data);
+                session()->setFlashdata('success', 'Leave request submitted.');
+            } catch (\Exception $e) {
+                session()->setFlashdata('error', $e->getMessage());
+            }
+            return redirect()->to('/student/leave_requests');
+        }
+        $data = ['leaveRequests' => $leaveModel->getLeavesByUser(session()->get('user_id'))];
+        return view('student/leave_requests', $data);
+    }
+}

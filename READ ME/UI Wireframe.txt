@@ -1,0 +1,229 @@
+DETAILED LAYOUT GUIDE
+
+This document provides a comprehensive layout guide for the Student, Teacher, and Admin portals, including tile-based interfaces, DataTable CRUD for admin, and modal interactions. It is intended as a blueprint for UI/UX implementation.
+
+\============================================================
+
+1. STUDENT PORTAL
+   \============================================================
+   NAVBAR:
+   • Dashboard  |  My Classes  |  Attendance Logs  |  Schedule  |  Profile
+
+1.1 Dashboard (Tile-based)
+
+* Tile: Today’s Classes
+  • Count of today’s sessions
+  • List of next 2 sessions: Class Name @ Time
+  • "Upcoming Sessions" horizontal scroll strip
+* Tile: Attendance Rate
+  • Percentage (e.g., 87%)
+  • Sparkline chart of past week
+* Tile: Notifications
+  • Unread count
+
+1.2 My Classes (Tiles)
+
+* Enrolled Class Tiles:
+  • Class Name
+  • Teacher Name
+  • Section
+  • Clickable to open Class Detail Subview
+
+1.2.1 Class Detail Subview
+
+* Header: Class Name / Subject / Teacher
+* Tabs:
+  • Attendance Overview
+  \- Pie chart + counts: Present / Absent / Late
+  \- Button: View All History
+  • Sessions
+  \- Session Tiles:
+  • Date / Time / Status badge
+  • Button: Join (if open) or Details
+  \- Tiles sorted by upcoming vs. past
+  • Leave Requests
+  \- Request Tiles:
+  • Date Range (From–To)
+  • Status badge (Pending, Approved, Rejected)
+  • Buttons: Edit, Cancel
+  \- Button: New Request (opens modal)
+  • Attendance History
+  \- Paginated list view
+  \- Columns: Date / Session / Status / Remarks
+  \- Filters: Status dropdown (All / Present / Late / Absent)
+
+1.3 Attendance Logs (List view)
+
+* List or tile rows
+* Columns: Date / Class / Session / Status
+* Filter bar: Date range picker, Class dropdown, Status dropdown
+
+1.4 Schedule (Calendar tiles)
+
+* Toggle: Day / Week / Month
+* Calendar grid showing class blocks
+* Click block: Tooltip with details + Go to Class button
+
+1.5 Profile (Modal or Inline Tiles)
+
+* Editable fields: Avatar, Name, Birthday, Gender, Contact Info, Bio
+* Save button
+
+\============================================================
+2\. TEACHER PORTAL
+==================
+
+NAVBAR:
+• Dashboard  |  My Classes  |  Leave Requests  |  Schedule  |  Reports  |  Profile
+
+2.1 Dashboard (Tile-based)
+
+* Schedule Tiles (today’s sessions):
+  • Time / Class / Room
+  • Buttons:
+  \- Start Class Session (if not auto-started)
+  \- Enter Session (if auto-started by cron)
+  \- Delete Session (confirm modal)
+* Alerts Panel (horizontal tiles):
+  • Pending Leave Requests count → open Leave Requests
+  • Pending Class Sessions count → open Sessions tab
+
+2.2 My Classes (Tiles)
+
+* Assigned Class Tiles:
+  • Class Name / Section / # Students
+  • Button: View Details
+
+2.2.1 Class Detail Subview
+
+* Tabs:
+  • Roster
+  \- Student Tiles:
+  • Name / ID
+  • Attendance fraction (e.g., 1/10)
+  • Sessions
+  \- Session Tiles:
+  • Date / Time / Status
+  • Buttons: Edit, Delete
+  • Icon: Edit Settings (opens modal)
+  \- Button: New Session (opens modal)
+  • Attendance
+  \- Dropdown: Select Session
+  \- Attendance Grid: Student Tiles + P/A/L selectors
+  \- Buttons: Save Attendance, Clear
+
+2.3 Leave Requests (Tiles)
+
+* Request Tiles:
+  • Student Name / Class / Dates / Status badge
+  • Buttons: Approve, Reject (confirm modal)
+* Filter: Status tabs (All / Pending / Approved / Rejected)
+
+2.4 Schedule (Calendar)
+
+* Teaching schedule grid (Day/Week)
+* Click block: Popover with Edit button (modal)
+
+2.5 Reports
+
+* Controls: Class selector, Date range picker
+* Outputs:
+  • Attendance Trend chart (line)
+  • Table: Top 10 Absent Students
+  • Buttons: Download CSV, Download PDF
+
+2.6 Profile (Modal)
+
+* Fields: Avatar, Name, Contact, Bio
+* Save button
+
+\============================================================
+3\. ADMIN PORTAL
+================
+
+NAVBAR:
+• Dashboard  |  Users  |  Students  |  Teachers  |  Classes  |  Subjects
+\| Enrollment Terms  |  Student Assignments  |  Teacher Assignments
+\| Rooms  |  Trackers  |  Notifications
+\| Class Sessions  |  Class Session Settings
+\| Attendance  |  Leave Requests  |  Schedule  |  Profile Settings
+
+3.1 Dashboard (Tiles)
+
+* Metric Tiles:
+  • Total Users by Role (Admin/Teacher/Student)
+  • Active Classes count
+  • Pending Leave Requests count
+  • Pending Class Sessions count
+* Recent Activity Tiles:
+  • Today’s Attendance %
+  • Latest 5 Leave Requests summary
+
+3.2 CRUD DataTables (with Modals)
+
+* Applies to: Users, Students, Teachers, Classes, Subjects,
+  Enrollment Terms, Student Assignments,
+  Teacher Assignments, Rooms, Trackers
+
+3.2.1 DataTable Features:
+
+* Columns: per model (ID, key fields, status, created on)
+* Global search box, column sorting, pagination, page-size selector
+* Bulk select checkboxes + Bulk Delete action
+
+3.2.2 CRUD Modals:
+
+* Add New: Opens modal with form fields matching `allowedFields`
+* Edit: Opens modal populated with existing data
+* Delete: Confirmation modal
+* Toggle Status (where applicable): Active/Archived
+
+3.3 Notifications (DataTable)
+
+* Columns: ID / User / Message / Status (Read/Unread) / Created On
+* Actions: Mark Read/Unread, Edit (modal), Delete (confirm)
+
+3.4 Class Session Settings (DataTable)
+
+* Columns: ID / attendance\_method / auto\_mark\_attendance
+  / auto\_create\_session / time\_in\_threshold
+  / time\_out\_threshold / late\_threshold / Actions
+* Actions: Add (modal), Edit (modal), Delete (confirm)
+
+3.5 Class Sessions (Tiles)
+
+* Session Tiles:
+  • Date / Time / Class / Status badge
+  • Actions: Edit (modal), Cancel (confirm)
+* Button: New Session (modal, includes settings selection)
+
+3.6 Attendance (Tiles & Subviews)
+
+* Overview Tiles: % marked today, sessions open
+* Drilldown: Choose class → session → Attendance Grid (tiles)
+
+3.7 Leave Requests (Tiles)
+
+* Tabs: All / Pending / Approved / Rejected
+* Request Tiles:
+  • Student / Class / Dates / Status
+  • Button: View Details (modal with Approve/Reject)
+
+3.8 Schedule (Calendar)
+
+* Calendar grid (Day/Week)
+* Click slot: Edit Schedule modal
+
+3.9 Profile Settings (Modal)
+
+* Fields: Avatar, Name, Email, Password
+* Save button
+
+\============================================================
+4\. RECOMMENDATIONS
+===================
+
+4.2 Shared Components
+
+* Build dynamic form generator based on model metadata
+* Centralize modals and DataTable configs

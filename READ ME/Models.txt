@@ -1,0 +1,2289 @@
+<?php
+namespace App\Models;
+
+use CodeIgniter\Model;
+
+class AttendanceLeaveModel extends Model
+{
+    protected $table = 'attendance_leave';
+    protected $primaryKey = 'attendance_leave_id';
+    protected $allowedFields = ['user_id', 'status', 'letter', 'datetimestamp_created', 'datetimestamp_reviewed', 'datetimestamp_resolved', 'deleted_at'];
+    protected $useSoftDeletes = true;
+    protected $deletedField = 'deleted_at';
+
+    protected $validationRules = [
+        'user_id' => 'required|is_not_unique[users.user_id]',
+        'status' => 'required|in_list[pending,approved,rejected]',
+        'letter' => 'required',
+        'datetimestamp_created' => 'permit_empty|valid_date',
+        'datetimestamp_reviewed' => 'permit_empty|valid_date',
+        'datetimestamp_resolved' => 'permit_empty|valid_date'
+    ];
+
+    protected $validationMessages = [
+        'user_id' => [
+            'required' => 'The user ID is required.',
+            'is_not_unique' => 'The user ID must reference an existing user.'
+        ],
+        'status' => [
+            'required' => 'The status is required.',
+            'in_list' => 'The status must be one of: pending, approved, rejected.'
+        ],
+        'letter' => [
+            'required' => 'The leave letter is required.'
+        ],
+        'datetimestamp_created' => [
+            'valid_date' => 'The creation date must be a valid date.'
+        ],
+        'datetimestamp_reviewed' => [
+            'valid_date' => 'The review date must be a valid date.'
+        ],
+        'datetimestamp_resolved' => [
+            'valid_date' => 'The resolution date must be a valid date.'
+        ]
+    ];
+
+    public function getLeave($leaveId, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->find($leaveId);
+        }
+        return $this->find($leaveId);
+    }
+
+    public function leaveExists($leaveId, $withDeleted = false)
+    {
+        $builder = $this->builder();
+        if ($withDeleted) {
+            $builder->withDeleted();
+        }
+        return $builder->where('attendance_leave_id', $leaveId)->get()->getRow() !== null;
+    }
+
+    public function createLeave($leaveData)
+    {
+        if (!$this->validate($leaveData)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        $this->insert($leaveData);
+        $leaveId = $this->getInsertID();
+        return $this->select('attendance_leave_id, user_id, status, letter')->find($leaveId);
+    }
+
+    public function updateLeave($leaveId, $leaveData)
+    {
+        $leaveData['attendance_leave_id'] = $leaveId;
+        if (!$this->validate($leaveData)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        unset($leaveData['attendance_leave_id']);
+        return $this->update($leaveId, $leaveData);
+    }
+
+    public function getLeavesByUser($userId, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->where('user_id', $userId)->findAll();
+        }
+        return $this->where('user_id', $userId)->findAll();
+    }
+
+    public function getLeavesByStatus($status, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->where('status', $status)->findAll();
+        }
+        return $this->where('status', $status)->findAll();
+    }
+
+    public function approveLeave($leaveId)
+    {
+        return $this->update($leaveId, ['status' => 'approved', 'datetimestamp_resolved' => date('Y-m-d H:i:s')]);
+    }
+
+    public function rejectLeave($leaveId)
+    {
+        return $this->update($leaveId, ['status' => 'rejected', 'datetimestamp_resolved' => date('Y-m-d H:i:s')]);
+    }
+
+    public function searchLeaves($searchTerm, $withDeleted = false)
+    {
+        $builder = $this->builder();
+        if ($withDeleted) {
+            $builder->withDeleted();
+        }
+        return $builder->like('letter', $searchTerm)
+                       ->orLike('status', $searchTerm)
+                       ->get()->getResultArray();
+    }
+
+    public function softDelete($leaveId)
+    {
+        try {
+            $this->delete($leaveId);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+
+    public function hardDelete($leaveId)
+    {
+        try {
+            $this->onlyDeleted()->delete($leaveId, true);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+
+    public function restore($leaveId)
+    {
+        try {
+            $this->onlyDeleted()->update($leaveId, ['deleted_at' => null]);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+}
+?>
+
+<?php
+namespace App\Models;
+
+use CodeIgniter\Model;
+
+class AttendanceLogsModel extends Model
+{
+    protected $table = 'attendance_logs';
+    protected $primaryKey = 'log_id';
+    protected $allowedFields = ['user_id', 'class_session_id', 'tracker_id', 'action', 'timestamp'];
+    protected $useSoftDeletes = false;
+
+    protected $validationRules = [
+        'user_id' => 'required|is_not_unique[users.user_id]',
+        'class_session_id' => 'required|is_not_unique[class_sessions.class_session_id]',
+        'tracker_id' => 'required|is_not_unique[trackers.tracker_id]',
+        'action' => 'required|in_list[time_in,time_out]',
+        'timestamp' => 'required|valid_date'
+    ];
+
+    protected $validationMessages = [
+        'user_id' => [
+            'required' => 'The user ID is required.',
+            'is_not_unique' => 'The user ID must reference an existing user.'
+        ],
+        'class_session_id' => [
+            'required' => 'The session ID is required.',
+            'is_not_unique' => 'The session ID must reference an existing session.'
+        ],
+        'tracker_id' => [
+            'required' => 'The tracker ID is required.',
+            'is_not_unique' => 'The tracker ID must reference an existing tracker.'
+        ],
+        'action' => [
+            'required' => 'The action is required.',
+            'in_list' => 'The action must be one of: time_in, time_out.'
+        ],
+        'timestamp' => [
+            'required' => 'The timestamp is required.',
+            'valid_date' => 'The timestamp must be a valid date.'
+        ]
+    ];
+
+    public function getLog($logId)
+    {
+        return $this->find($logId);
+    }
+
+    public function logExists($logId)
+    {
+        return $this->builder()->where('log_id', $logId)->get()->getRow() !== null;
+    }
+
+    public function createLog($logData)
+    {
+        if (!$this->validate($logData)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        $this->insert($logData);
+        $logId = $this->getInsertID();
+        return $this->select('log_id, user_id, class_session_id, tracker_id, action, timestamp')->find($logId);
+    }
+
+    public function updateLog($logId, $logData)
+    {
+        $logData['log_id'] = $logId;
+        if (!$this->validate($logData)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        unset($logData['log_id']);
+        return $this->update($logId, $logData);
+    }
+
+    public function getLogsByUser($userId)
+    {
+        return $this->where('user_id', $userId)->findAll();
+    }
+
+    public function getLogsBySession($sessionId)
+    {
+        return $this->where('class_session_id', $sessionId)->findAll();
+    }
+
+    public function getLogsByTracker($trackerId)
+    {
+        return $this->where('tracker_id', $trackerId)->findAll();
+    }
+
+    public function getLogsByDateRange($startDate, $endDate)
+    {
+        return $this->where('timestamp >=', $startDate)->where('timestamp <=', $endDate)->findAll();
+    }
+
+    public function searchLogs($searchTerm)
+    {
+        return $this->builder()->like('action', $searchTerm)
+                              ->orLike('timestamp', $searchTerm)
+                              ->get()->getResultArray();
+    }
+}
+?>
+
+<?php
+namespace App\Models;
+
+use CodeIgniter\Model;
+
+class AttendanceModel extends Model
+{
+    protected $table = 'attendance';
+    protected $primaryKey = 'attendance_id';
+    protected $allowedFields = ['user_id', 'class_session_id', 'status'];
+    protected $useSoftDeletes = false;
+
+    protected $validationRules = [
+        'user_id' => 'required|is_not_unique[users.user_id]',
+        'class_session_id' => 'required|is_not_unique[class_sessions.class_session_id]',
+        'status' => 'required|in_list[present,absent,late,unmarked]'
+    ];
+
+    protected $validationMessages = [
+        'user_id' => [
+            'required' => 'The user ID is required.',
+            'is_not_unique' => 'The user ID must reference an existing user.'
+        ],
+        'class_session_id' => [
+            'required' => 'The session ID is required.',
+            'is_not_unique' => 'The session ID must reference an existing session.'
+        ],
+        'status' => [
+            'required' => 'The status is required.',
+            'in_list' => 'The status must be one of: present, absent, late, unmarked.'
+        ]
+    ];
+
+    public function getAttendance($attendanceId)
+    {
+        return $this->find($attendanceId);
+    }
+
+    public function attendanceExists($attendanceId)
+    {
+        return $this->builder()->where('attendance_id', $attendanceId)->get()->getRow() !== null;
+    }
+
+    public function createAttendance($attendanceData)
+    {
+        if (!$this->validate($attendanceData)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        $this->insert($attendanceData);
+        $attendanceId = $this->getInsertID();
+        return $this->select('attendance_id, user_id, class_session_id, status')->find($attendanceId);
+    }
+
+    public function updateAttendance($attendanceId, $attendanceData)
+    {
+        $attendanceData['attendance_id'] = $attendanceId;
+        if (!$this->validate($attendanceData)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        unset($attendanceData['attendance_id']);
+        return $this->update($attendanceId, $attendanceData);
+    }
+
+    public function getAttendanceBySession($sessionId)
+    {
+        return $this->where('class_session_id', $sessionId)->findAll();
+    }
+
+    public function getAttendanceByUser($userId)
+    {
+        return $this->where('user_id', $userId)->findAll();
+    }
+
+    public function calculateAttendancePercentage($userId, $classId)
+    {
+        $totalSessions = $this->join('class_sessions', 'class_sessions.class_session_id = attendance.class_session_id')
+                             ->where('class_sessions.class_id', $classId)
+                             ->countAllResults();
+        $presentCount = $this->where('user_id', $userId)
+                            ->where('class_session_id IN (SELECT class_session_id FROM class_sessions WHERE class_id = ' . $classId . ')')
+                            ->where('status', 'present')
+                            ->countAllResults();
+        return $totalSessions > 0 ? ($presentCount / $totalSessions) * 100 : 0;
+    }
+
+    public function searchAttendance($searchTerm)
+    {
+        return $this->builder()->like('status', $searchTerm)
+                              ->get()->getResultArray();
+    }
+}
+?>
+
+<?php
+namespace App\Models;
+
+use CodeIgniter\Model;
+
+class ClassModel extends Model
+{
+    protected $table = 'class';
+    protected $primaryKey = 'class_id';
+    protected $allowedFields = ['class_name', 'class_description', 'subject_id', 'teacher_id', 'section', 'class_settings_id', 'deleted_at'];
+    protected $useSoftDeletes = true;
+    protected $deletedField = 'deleted_at';
+
+    protected $validationRules = [
+        'class_name' => 'required|max_length[255]',
+        'class_description' => 'permit_empty',
+        'subject_id' => 'required|is_not_unique[subject.subject_id]',
+        'teacher_id' => 'required|is_not_unique[users.user_id]',
+        'section' => 'required|max_length[10]',
+        'class_settings_id' => 'required|is_not_unique[class_session_settings.class_session_settings_id]'
+    ];
+
+    protected $validationMessages = [
+        'class_name' => [
+            'required' => 'The class name is required.',
+            'max_length' => 'The class name cannot exceed 255 characters.'
+        ],
+        'class_description' => [
+            'permit_empty' => 'The class description is optional.'
+        ],
+        'subject_id' => [
+            'required' => 'The subject ID is required.',
+            'is_not_unique' => 'The subject ID must reference an existing subject.'
+        ],
+        'teacher_id' => [
+            'required' => 'The teacher ID is required.',
+            'is_not_unique' => 'The teacher ID must reference an existing user.'
+        ],
+        'section' => [
+            'required' => 'The section is required.',
+            'max_length' => 'The section cannot exceed 10 characters.'
+        ],
+        'class_settings_id' => [
+            'required' => 'The class settings ID is required.',
+            'is_not_unique' => 'The class settings ID must reference an existing setting.'
+        ]
+    ];
+
+    public function getClass($classId, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->find($classId);
+        }
+        return $this->find($classId);
+    }
+
+    public function classExists($classId, $withDeleted = false)
+    {
+        $builder = $this->builder();
+        if ($withDeleted) {
+            $builder->withDeleted();
+        }
+        return $builder->where('class_id', $classId)->get()->getRow() !== null;
+    }
+
+    public function createClass($classData)
+    {
+        if (!$this->validate($classData)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        $this->insert($classData);
+        $classId = $this->getInsertID();
+        return $this->select('class_id, class_name, subject_id, teacher_id, section')->find($classId);
+    }
+
+    public function updateClass($classId, $classData)
+    {
+        $classData['class_id'] = $classId;
+        if (!$this->validate($classData)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        unset($classData['class_id']);
+        return $this->update($classId, $classData);
+    }
+
+    public function getClassesBySubject($subjectId, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->where('subject_id', $subjectId)->findAll();
+        }
+        return $this->where('subject_id', $subjectId)->findAll();
+    }
+
+    public function getClassesByTerm($termId, $withDeleted = false)
+    {
+        $builder = $this->select('class.*')
+                        ->join('teacher_assignment', 'teacher_assignment.class_id = class.class_id')
+                        ->where('teacher_assignment.enrollment_term_id', $termId);
+        if (!$withDeleted) {
+            $builder->where('class.deleted_at IS NULL');
+        }
+        return $builder->findAll();
+    }
+
+    public function getClassesByTeacher($teacherId, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->where('teacher_id', $teacherId)->findAll();
+        }
+        return $this->where('teacher_id', $teacherId)->findAll();
+    }
+
+    public function getClassesBySection($section, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->where('section', $section)->findAll();
+        }
+        return $this->where('section', $section)->findAll();
+    }
+
+    public function getClassSettings($classId)
+    {
+        $class = $this->find($classId);
+        if ($class && isset($class['class_settings_id'])) {
+            $settingsModel = new \App\Models\ClassSessionSettingsModel();
+            return $settingsModel->find($class['class_settings_id']);
+        }
+        return null;
+    }
+
+    public function searchClasses($searchTerm, $withDeleted = false)
+    {
+        $builder = $this->builder();
+        if ($withDeleted) {
+            $builder->withDeleted();
+        }
+        return $builder->like('class_name', $searchTerm)
+                       ->orLike('section', $searchTerm)
+                       ->get()->getResultArray();
+    }
+
+    public function softDelete($classId)
+    {
+        try {
+            $this->delete($classId);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+
+    public function hardDelete($classId)
+    {
+        try {
+            $this->onlyDeleted()->delete($classId, true);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+
+    public function restore($classId)
+    {
+        try {
+            $this->onlyDeleted()->update($classId, ['deleted_at' => null]);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+}
+?>
+
+<?php
+namespace App\Models;
+
+use CodeIgniter\Model;
+
+class ClassSessionModel extends Model
+{
+    protected $table = 'class_sessions';
+    protected $primaryKey = 'class_session_id';
+    protected $allowedFields = [
+        'class_session_name', 'class_session_description', 'class_id', 'open_datetime', 'close_datetime',
+        'status', 'attendance_method', 'auto_mark_attendance', 'time_in_threshold', 'time_out_threshold',
+        'late_threshold', 'deleted_at'
+    ];
+    protected $useSoftDeletes = true;
+    protected $deletedField = 'deleted_at';
+
+    protected $validationRules = [
+        'class_session_name' => 'required|max_length[255]',
+        'class_session_description' => 'permit_empty',
+        'class_id' => 'required|is_not_unique[class.class_id]',
+        'open_datetime' => 'required|valid_date',
+        'close_datetime' => 'required|valid_date',
+        'status' => 'required|in_list[marked,cancelled,pending]',
+        'attendance_method' => 'required|in_list[manual,automatic]',
+        'auto_mark_attendance' => 'required|in_list[yes,no]',
+        'time_in_threshold' => 'required',
+        'time_out_threshold' => 'required',
+        'late_threshold' => 'required'
+    ];
+
+    protected $validationMessages = [
+        'class_session_name' => [
+            'required' => 'The session name is required.',
+            'max_length' => 'The session name cannot exceed 255 characters.'
+        ],
+        'class_session_description' => [
+            'permit_empty' => 'The session description is optional.'
+        ],
+        'class_id' => [
+            'required' => 'The class ID is required.',
+            'is_not_unique' => 'The class ID must reference an existing class.'
+        ],
+        'open_datetime' => [
+            'required' => 'The open datetime is required.',
+            'valid_date' => 'The open datetime must be a valid date.'
+        ],
+        'close_datetime' => [
+            'required' => 'The close datetime is required.',
+            'valid_date' => 'The close datetime must be a valid date.'
+        ],
+        'status' => [
+            'required' => 'The status is required.',
+            'in_list' => 'The status must be one of: marked, cancelled, pending.'
+        ],
+        'attendance_method' => [
+            'required' => 'The attendance method is required.',
+            'in_list' => 'The attendance method must be one of: manual, automatic.'
+        ],
+        'auto_mark_attendance' => [
+            'required' => 'The auto mark attendance setting is required.',
+            'in_list' => 'The auto mark attendance must be one of: yes, no.'
+        ],
+        'time_in_threshold' => [
+            'required' => 'The time-in threshold is required.'
+        ],
+        'time_out_threshold' => [
+            'required' => 'The time-out threshold is required.'
+        ],
+        'late_threshold' => [
+            'required' => 'The late threshold is required.'
+        ]
+    ];
+
+    public function getSession($sessionId, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->find($sessionId);
+        }
+        return $this->find($sessionId);
+    }
+
+    public function sessionExists($sessionId, $withDeleted = false)
+    {
+        $builder = $this->builder();
+        if ($withDeleted) {
+            $builder->withDeleted();
+        }
+        return $builder->where('class_session_id', $sessionId)->get()->getRow() !== null;
+    }
+
+    public function createSession($sessionData)
+    {
+        if (!$this->validate($sessionData)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        $this->insert($sessionData);
+        $sessionId = $this->getInsertID();
+        return $this->select('class_session_id, class_session_name, class_id, open_datetime, close_datetime')->find($sessionId);
+    }
+
+    public function updateSession($sessionId, $sessionData)
+    {
+        $sessionData['class_session_id'] = $sessionId;
+        if (!$this->validate($sessionData)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        unset($sessionData['class_session_id']);
+        return $this->update($sessionId, $sessionData);
+    }
+
+    public function getSessionsByClass($classId, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->where('class_id', $classId)->findAll();
+        }
+        return $this->where('class_id', $classId)->findAll();
+    }
+
+    public function getSessionsByDateRange($startDate, $endDate, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->where('open_datetime >=', $startDate)->where('close_datetime <=', $endDate)->findAll();
+        }
+        return $this->where('open_datetime >=', $startDate)->where('close_datetime <=', $endDate)->findAll();
+    }
+
+    public function getSessionsByStatus($status, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->where('status', $status)->findAll();
+        }
+        return $this->where('status', $status)->findAll();
+    }
+
+    public function searchSessions($searchTerm, $withDeleted = false)
+    {
+        $builder = $this->builder();
+        if ($withDeleted) {
+            $builder->withDeleted();
+        }
+        return $builder->like('class_session_name', $searchTerm)
+                       ->orLike('status', $searchTerm)
+                       ->get()->getResultArray();
+    }
+
+    public function softDelete($sessionId)
+    {
+        try {
+            $this->delete($sessionId);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+
+    public function hardDelete($sessionId)
+    {
+        try {
+            $this->onlyDeleted()->delete($sessionId, true);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+
+    public function restore($sessionId)
+    {
+        try {
+            $this->onlyDeleted()->update($sessionId, ['deleted_at' => null]);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+}
+?>
+
+<?php
+
+namespace App\Models;
+
+use CodeIgniter\Model;
+
+class ClassSessionSettingsModel extends Model
+{
+    protected $table = 'class_session_settings';
+    protected $primaryKey = 'class_session_settings_id';
+    protected $allowedFields = [
+        'attendance_method', 'time_in_threshold', 'time_out_threshold', 'late_threshold',
+        'auto_create_session', 'auto_mark_attendance', 'deleted_at'
+    ];
+    protected $useSoftDeletes = true;
+    protected $deletedField = 'deleted_at';
+
+    protected $validationRules = [
+        'attendance_method' => 'required|in_list[manual,automatic]',
+        'time_in_threshold' => 'required|valid_time',
+        'time_out_threshold' => 'required|valid_time',
+        'late_threshold' => 'required|valid_time',
+        'auto_create_session' => 'required|in_list[yes,no]',
+        'auto_mark_attendance' => 'required|in_list[yes,no]'
+    ];
+
+    protected $validationMessages = [
+        'attendance_method' => [
+            'required' => 'The attendance method is required.',
+            'in_list' => 'The attendance method must be one of: manual, automatic.'
+        ],
+        'time_in_threshold' => [
+            'required' => 'The time in threshold is required.',
+            'valid_time' => 'The time in threshold must be a valid time.'
+        ],
+        'time_out_threshold' => [
+            'required' => 'The time out threshold is required.',
+            'valid_time' => 'The time out threshold must be a valid time.'
+        ],
+        'late_threshold' => [
+            'required' => 'The late threshold is required.',
+            'valid_time' => 'The late threshold must be a valid time.'
+        ],
+        'auto_create_session' => [
+            'required' => 'The auto create session setting is required.',
+            'in_list' => 'The auto create session setting must be one of: yes, no.'
+        ],
+        'auto_mark_attendance' => [
+            'required' => 'The auto mark attendance setting is required.',
+            'in_list' => 'The auto mark attendance setting must be one of: yes, no.'
+        ]
+    ];
+
+    public function getSettings($settingsId, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->find($settingsId);
+        }
+        return $this->find($settingsId);
+    }
+
+    public function updateSettings($settingsId, $settingsData)
+    {
+        $settingsData['class_session_settings_id'] = $settingsId;
+        if (!$this->validate($settingsData)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        unset($settingsData['class_session_settings_id']);
+        return $this->update($settingsId, $settingsData);
+    }
+
+    public function softDelete($settingsId)
+    {
+        try {
+            $this->delete($settingsId);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+
+    public function restore($settingsId)
+    {
+        try {
+            $this->onlyDeleted()->update($settingsId, ['deleted_at' => null]);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+}
+
+<?php
+
+namespace App\Models;
+
+use CodeIgniter\Model;
+
+class EnrollmentTermModel extends Model
+{
+    protected $table = 'enrollment_term';
+    protected $primaryKey = 'enrollment_term_id';
+    protected $allowedFields = [
+        'academic_year', 'semester', 'sem_start', 'sem_end', 'term_start', 'term_end',
+        'term_description', 'status', 'deleted_at'
+    ];
+    protected $useSoftDeletes = true;
+    protected $deletedField = 'deleted_at';
+
+    protected $validationRules = [
+        'academic_year' => 'required|exact_length[9]',
+        'semester' => 'required|in_list[1st,2nd,summer]',
+        'sem_start' => 'required|valid_date',
+        'sem_end' => 'required|valid_date',
+        'term_start' => 'required|valid_date',
+        'term_end' => 'required|valid_date',
+        'term_description' => 'permit_empty',
+        'status' => 'required|in_list[active,inactive]'
+    ];
+
+    protected $validationMessages = [
+        'academic_year' => [
+            'required' => 'The academic year is required.',
+            'exact_length' => 'The academic year must be exactly 9 characters long.'
+        ],
+        'semester' => [
+            'required' => 'The semester is required.',
+            'in_list' => 'The semester must be one of: 1st, 2nd, summer.'
+        ],
+        'sem_start' => [
+            'required' => 'The semester start date is required.',
+            'valid_date' => 'The semester start date must be a valid date.'
+        ],
+        'sem_end' => [
+            'required' => 'The semester end date is required.',
+            'valid_date' => 'The semester end date must be a valid date.'
+        ],
+        'term_start' => [
+            'required' => 'The term start date is required.',
+            'valid_date' => 'The term start date must be a valid date.'
+        ],
+        'term_end' => [
+            'required' => 'The term end date is required.',
+            'valid_date' => 'The term end date must be a valid date.'
+        ],
+        'status' => [
+            'required' => 'The status is required.',
+            'in_list' => 'The status must be one of: active, inactive.'
+        ]
+    ];
+
+    public function getTerm($termId, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->find($termId);
+        }
+        return $this->find($termId);
+    }
+
+    public function updateTerm($termId, $termData)
+    {
+        $termData['enrollment_term_id'] = $termId;
+        if (!$this->validate($termData)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        unset($termData['enrollment_term_id']);
+        return $this->update($termId, $termData);
+    }
+
+    public function getCurrentTerm()
+    {
+        $currentDate = date('Y-m-d');
+        return $this->where('term_start <=', $currentDate)
+                    ->where('term_end >=', $currentDate)
+                    ->where('status', 'active')
+                    ->first();
+    }
+
+    public function softDelete($termId)
+    {
+        try {
+            $this->delete($termId);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+
+    public function restore($termId)
+    {
+        try {
+            $this->onlyDeleted()->update($termId, ['deleted_at' => null]);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+}
+
+<?php
+namespace App\Models;
+
+use CodeIgniter\Model;
+
+class NotificationsModel extends Model
+{
+    protected $table = 'notifications';
+    protected $primaryKey = 'notif_id';
+    protected $allowedFields = ['user_id', 'message', 'status', 'deleted_at'];
+    protected $useSoftDeletes = true;
+    protected $deletedField = 'deleted_at';
+
+    protected $validationRules = [
+        'user_id' => 'required|is_not_unique[users.user_id]',
+        'message' => 'required',
+        'status' => 'required|in_list[read,unread]'
+    ];
+
+    protected $validationMessages = [
+        'user_id' => [
+            'required' => 'The user ID is required.',
+            'is_not_unique' => 'The user ID must reference an existing user.'
+        ],
+        'message' => [
+            'required' => 'The message is required.'
+        ],
+        'status' => [
+            'required' => 'The status is required.',
+            'in_list' => 'The status must be one of: read, unread.'
+        ]
+    ];
+
+    public function getNotification($notifId, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->find($notifId);
+        }
+        return $this->find($notifId);
+    }
+
+    public function notificationExists($notifId, $withDeleted = false)
+    {
+        $builder = $this->builder();
+        if ($withDeleted) {
+            $builder->withDeleted();
+        }
+        return $builder->where('notif_id', $notifId)->get()->getRow() !== null;
+    }
+
+    public function createNotification($notifData)
+    {
+        if (!$this->validate($notifData)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        $this->insert($notifData);
+        $notifId = $this->getInsertID();
+        return $this->select('notif_id, user_id, message, status')->find($notifId);
+    }
+
+    public function updateNotification($notifId, $notifData)
+    {
+        $notifData['notif_id'] = $notifId;
+        if (!$this->validate($notifData)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        unset($notifData['notif_id']);
+        return $this->update($notifId, $notifData);
+    }
+
+    public function getUnreadNotifications($userId, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->where('user_id', $userId)->where('status', 'unread')->findAll();
+        }
+        return $this->where('user_id', $userId)->where('status', 'unread')->findAll();
+    }
+
+    public function markAsRead($notifId)
+    {
+        return $this->update($notifId, ['status' => 'read']);
+    }
+
+    public function searchNotifications($searchTerm, $withDeleted = false)
+    {
+        $builder = $this->builder();
+        if ($withDeleted) {
+            $builder->withDeleted();
+        }
+        return $builder->like('message', $searchTerm)
+                       ->orLike('status', $searchTerm)
+                       ->get()->getResultArray();
+    }
+
+    public function softDelete($notifId)
+    {
+        try {
+            $this->delete($notifId);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+
+    public function hardDelete($notifId)
+    {
+        try {
+            $this->onlyDeleted()->delete($notifId, true);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+
+    public function restore($notifId)
+    {
+        try {
+            $this->onlyDeleted()->update($notifId, ['deleted_at' => null]);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+}
+?>
+
+<?php
+
+namespace App\Models;
+
+use CodeIgniter\Model;
+
+class RoomModel extends Model
+{
+    protected $table = 'rooms';
+    protected $primaryKey = 'room_id';
+    protected $allowedFields = [
+        'room_name', 'room_description', 'room_capacity', 'room_type', 'room_status', 'tracker_id', 'deleted_at'
+    ];
+    protected $useSoftDeletes = true;
+    protected $deletedField = 'deleted_at';
+
+    protected $validationRules = [
+        'room_name' => 'required|is_unique[rooms.room_name,room_id,{room_id}]|max_length[255]',
+        'room_description' => 'permit_empty',
+        'room_capacity' => 'required|integer|greater_than_equal_to[0]',
+        'room_type' => 'required|in_list[classroom,laboratory,office]',
+        'room_status' => 'required|in_list[active,inactive]',
+        'tracker_id' => 'permit_empty|integer'
+    ];
+
+    protected $validationMessages = [
+        'room_name' => [
+            'required' => 'The room name is required.',
+            'is_unique' => 'The room name must be unique.',
+            'max_length' => 'The room name cannot exceed 255 characters.'
+        ],
+        'room_capacity' => [
+            'required' => 'The room capacity is required.',
+            'integer' => 'The room capacity must be an integer.',
+            'greater_than_equal_to' => 'The room capacity must be at least 0.'
+        ],
+        'room_type' => [
+            'required' => 'The room type is required.',
+            'in_list' => 'The room type must be one of: classroom, laboratory, office.'
+        ],
+        'room_status' => [
+            'required' => 'The room status is required.',
+            'in_list' => 'The room status must be one of: active, inactive.'
+        ],
+        'tracker_id' => [
+            'integer' => 'The tracker ID must be an integer.'
+        ]
+    ];
+
+    public function getRoom($roomId, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->find($roomId);
+        }
+        return $this->find($roomId);
+    }
+
+    public function getRoomsByTracker($trackerId, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->where('tracker_id', $trackerId)->findAll();
+        }
+        return $this->where('tracker_id', $trackerId)->findAll();
+    }
+
+    public function updateRoom($roomId, $roomData)
+    {
+        $roomData['room_id'] = $roomId;
+        if (!$this->validate($roomData)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        unset($roomData['room_id']);
+        return $this->update($roomId, $roomData);
+    }
+
+    public function getRoomsByType($roomType, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->where('room_type', $roomType)->findAll();
+        }
+        return $this->where('room_type', $roomType)->findAll();
+    }
+
+    public function softDelete($roomId)
+    {
+        try {
+            $this->delete($roomId);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+
+    public function restore($roomId)
+    {
+        try {
+            $this->onlyDeleted()->update($roomId, ['deleted_at' => null]);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+}
+
+<?php
+namespace App\Models;
+
+use CodeIgniter\Model;
+
+class ScheduleModel extends Model
+{
+    protected $table = 'schedule';
+    protected $primaryKey = 'rts_id';
+    protected $allowedFields = ['room_id', 'time_start', 'time_end', 'week_day', 'class_id', 'status', 'deleted_at'];
+    protected $useSoftDeletes = true;
+    protected $deletedField = 'deleted_at';
+
+    protected $validationRules = [
+        'room_id' => 'required|is_not_unique[rooms.room_id]',
+        'time_start' => 'required',
+        'time_end' => 'required',
+        'week_day' => 'required|in_list[mon,tue,wed,thu,fri,sat]',
+        'class_id' => 'required|is_not_unique[class.class_id]',
+        'status' => 'permit_empty|in_list[active,archived]'
+    ];
+
+    protected $validationMessages = [
+        'room_id' => [
+            'required' => 'The room ID is required.',
+            'is_not_unique' => 'The room ID must reference an existing room.'
+        ],
+        'time_start' => [
+            'required' => 'The start time is required.'
+        ],
+        'time_end' => [
+            'required' => 'The end time is required.'
+        ],
+        'week_day' => [
+            'required' => 'The weekday is required.',
+            'in_list' => 'The weekday must be one of: mon, tue, wed, thu, fri, sat.'
+        ],
+        'class_id' => [
+            'required' => 'The class ID is required.',
+            'is_not_unique' => 'The class ID must reference an existing class.'
+        ],
+        'status' => [
+            'in_list' => 'The status must be one of: active, archived.'
+        ]
+    ];
+
+    public function getSchedule($scheduleId, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->find($scheduleId);
+        }
+        return $this->find($scheduleId);
+    }
+
+    public function scheduleExists($scheduleId, $withDeleted = false)
+    {
+        $builder = $this->builder();
+        if ($withDeleted) {
+            $builder->withDeleted();
+        }
+        return $builder->where('rts_id', $scheduleId)->get()->getRow() !== null;
+    }
+
+    public function createSchedule($scheduleData)
+    {
+        if (!$this->validate($scheduleData)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        if ($this->checkScheduleConflict($scheduleData['room_id'], $scheduleData['week_day'], $scheduleData['time_start'], $scheduleData['time_end'])) {
+            throw new \Exception('Schedule conflict detected.');
+        }
+        $this->insert($scheduleData);
+        $scheduleId = $this->getInsertID();
+        return $this->select('rts_id, room_id, time_start, time_end, week_day, class_id')->find($scheduleId);
+    }
+
+    public function updateSchedule($scheduleId, $scheduleData)
+    {
+        $scheduleData['rts_id'] = $scheduleId;
+        if (!$this->validate($scheduleData)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        unset($scheduleData['rts_id']);
+        if ($this->checkScheduleConflict($scheduleData['room_id'], $scheduleData['week_day'], $scheduleData['time_start'], $scheduleData['time_end']) && !$this->scheduleExists($scheduleId)) {
+            throw new \Exception('Schedule conflict detected.');
+        }
+        return $this->update($scheduleId, $scheduleData);
+    }
+
+    public function getSchedulesByRoom($roomId, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->where('room_id', $roomId)->findAll();
+        }
+        return $this->where('room_id', $roomId)->findAll();
+    }
+
+    public function getSchedulesByClass($classId, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->where('class_id', $classId)->findAll();
+        }
+        return $this->where('class_id', $classId)->findAll();
+    }
+
+    public function checkScheduleConflict($roomId, $weekDay, $timeStart, $timeEnd)
+    {
+        return $this->where('room_id', $roomId)
+                    ->where('week_day', $weekDay)
+                    ->where('time_start <', $timeEnd)
+                    ->where('time_end >', $timeStart)
+                    ->withDeleted(false)
+                    ->countAllResults() > 0;
+    }
+
+    public function searchSchedules($searchTerm, $withDeleted = false)
+    {
+        $builder = $this->builder();
+        if ($withDeleted) {
+            $builder->withDeleted();
+        }
+        return $builder->like('week_day', $searchTerm)
+                       ->orLike('status', $searchTerm)
+                       ->get()->getResultArray();
+    }
+
+    public function softDelete($scheduleId)
+    {
+        try {
+            $this->delete($scheduleId);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+
+    public function hardDelete($scheduleId)
+    {
+        try {
+            $this->onlyDeleted()->delete($scheduleId, true);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+
+    public function restore($scheduleId)
+    {
+        try {
+            $this->onlyDeleted()->update($scheduleId, ['deleted_at' => null]);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+}
+?>
+
+<?php
+namespace App\Models;
+
+use CodeIgniter\Model;
+
+class StudentAssignmentModel extends Model
+{
+    protected $table = 'student_assignment';
+    protected $primaryKey = 'enrollment_id';
+    protected $allowedFields = ['student_id', 'class_id', 'enrollment_datetime', 'enrollment_term_id', 'deleted_at'];
+    protected $useSoftDeletes = true;
+    protected $deletedField = 'deleted_at';
+
+    protected $validationRules = [
+        'student_id' => 'required|is_not_unique[users.user_id]',
+        'class_id' => 'required|is_not_unique[class.class_id]',
+        'enrollment_datetime' => 'permit_empty|valid_date',
+        'enrollment_term_id' => 'required|is_not_unique[enrollment_term.enrollment_term_id]'
+    ];
+
+    protected $validationMessages = [
+        'student_id' => [
+            'required' => 'The student ID is required.',
+            'is_not_unique' => 'The student ID must reference an existing user.'
+        ],
+        'class_id' => [
+            'required' => 'The class ID is required.',
+            'is_not_unique' => 'The class ID must reference an existing class.'
+        ],
+        'enrollment_datetime' => [
+            'valid_date' => 'The enrollment datetime must be a valid date.'
+        ],
+        'enrollment_term_id' => [
+            'required' => 'The term ID is required.',
+            'is_not_unique' => 'The term ID must reference an existing term.'
+        ]
+    ];
+
+    public function getEnrollment($enrollmentId, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->find($enrollmentId);
+        }
+        return $this->find($enrollmentId);
+    }
+
+    public function enrollmentExists($enrollmentId, $withDeleted = false)
+    {
+        $builder = $this->builder();
+        if ($withDeleted) {
+            $builder->withDeleted();
+        }
+        return $builder->where('enrollment_id', $enrollmentId)->get()->getRow() !== null;
+    }
+
+    public function createEnrollment($enrollmentData)
+    {
+        if (!$this->validate($enrollmentData)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        $this->insert($enrollmentData);
+        $enrollmentId = $this->getInsertID();
+        return $this->select('enrollment_id, student_id, class_id, enrollment_term_id')->find($enrollmentId);
+    }
+
+    public function updateEnrollment($enrollmentId, $enrollmentData)
+    {
+        $enrollmentData['enrollment_id'] = $enrollmentId;
+        if (!$this->validate($enrollmentData)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        unset($enrollmentData['enrollment_id']);
+        return $this->update($enrollmentId, $enrollmentData);
+    }
+
+    public function enrollStudent($studentId, $classId, $termId)
+    {
+        $data = [
+            'student_id' => $studentId,
+            'class_id' => $classId,
+            'enrollment_term_id' => $termId
+        ];
+        if (!$this->validate($data)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        $this->insert($data);
+        return $this->getInsertID();
+    }
+
+    public function getEnrolledStudents($classId, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->where('class_id', $classId)->findAll();
+        }
+        return $this->where('class_id', $classId)->findAll();
+    }
+
+    public function isStudentEnrolled($studentId, $classId, $withDeleted = false)
+    {
+        $builder = $this->builder();
+        if ($withDeleted) {
+            $builder->withDeleted();
+        }
+        return $builder->where('student_id', $studentId)->where('class_id', $classId)->get()->getRow() !== null;
+    }
+
+    public function searchEnrollments($searchTerm, $withDeleted = false)
+    {
+        $builder = $this->builder();
+        if ($withDeleted) {
+            $builder->withDeleted();
+        }
+        return $builder->like('enrollment_datetime', $searchTerm)
+                       ->get()->getResultArray();
+    }
+
+    public function bulkEnroll($studentIds, $classId, $termId)
+    {
+        $success = [];
+        $failed = [];
+
+        foreach ($studentIds as $studentId) {
+            try {
+                if ($this->isStudentEnrolled($studentId, $classId)) {
+                    $failed[] = "Student ID $studentId: Already enrolled.";
+                    continue;
+                }
+                $enrollmentId = $this->enrollStudent($studentId, $classId, $termId);
+                $success[] = "Student ID $studentId: Enrolled (ID: $enrollmentId).";
+            } catch (\Exception $e) {
+                $failed[] = "Student ID $studentId: " . $e->getMessage();
+            }
+        }
+
+        return ['success' => $success, 'failed' => $failed];
+    }
+
+    public function softDelete($enrollmentId)
+    {
+        try {
+            $this->delete($enrollmentId);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+
+    public function hardDelete($enrollmentId)
+    {
+        try {
+            $this->onlyDeleted()->delete($enrollmentId, true);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+
+    public function restore($enrollmentId)
+    {
+        try {
+            $this->onlyDeleted()->update($enrollmentId, ['deleted_at' => null]);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+    
+}
+?>
+
+<?php
+
+namespace App\Models;
+
+use CodeIgniter\Model;
+
+class SubjectModel extends Model
+{
+    protected $table = 'subject';
+    protected $primaryKey = 'subject_id';
+    protected $allowedFields = ['subject_code', 'subject_name', 'subject_description', 'subject_credits', 'deleted_at'];
+    protected $useSoftDeletes = true;
+    protected $deletedField = 'deleted_at';
+
+    protected $validationRules = [
+        'subject_code' => 'required|is_unique[subject.subject_code,subject_id,{subject_id}]|max_length[50]',
+        'subject_name' => 'required|max_length[255]',
+        'subject_description' => 'permit_empty',
+        'subject_credits' => 'required|integer|greater_than_equal_to[0]'
+    ];
+
+    protected $validationMessages = [
+        'subject_code' => [
+            'required' => 'The subject code is required.',
+            'is_unique' => 'The subject code must be unique.',
+            'max_length' => 'The subject code cannot exceed 50 characters.'
+        ],
+        'subject_name' => [
+            'required' => 'The subject name is required.',
+            'max_length' => 'The subject name cannot exceed 255 characters.'
+        ],
+        'subject_credits' => [
+            'required' => 'The subject credits are required.',
+            'integer' => 'The subject credits must be an integer.',
+            'greater_than_equal_to' => 'The subject credits must be at least 0.'
+        ]
+    ];
+
+    public function getSubject($subjectId, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->find($subjectId);
+        }
+        return $this->find($subjectId);
+    }
+
+    public function updateSubject($subjectId, $subjectData)
+    {
+        $subjectData['subject_id'] = $subjectId;
+        if (!$this->validate($subjectData)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        unset($subjectData['subject_id']);
+        return $this->update($subjectId, $subjectData);
+    }
+
+    public function searchSubjects($searchTerm, $withDeleted = false)
+    {
+        $builder = $this->builder();
+        if ($withDeleted) {
+            $builder->withDeleted();
+        }
+        return $builder->like('subject_code', $searchTerm)
+                       ->orLike('subject_name', $searchTerm)
+                       ->get()->getResultArray();
+    }
+
+    public function softDelete($subjectId)
+    {
+        try {
+            $this->delete($subjectId);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+
+    public function restore($subjectId)
+    {
+        try {
+            $this->onlyDeleted()->update($subjectId, ['deleted_at' => null]);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+}
+
+<?php
+namespace App\Models;
+
+use CodeIgniter\Model;
+
+class TeacherAssignmentModel extends Model
+{
+    protected $table = 'teacher_assignment';
+    protected $primaryKey = 'assignment_id';
+    protected $allowedFields = ['teacher_id', 'class_id', 'assigned_date', 'enrollment_term_id', 'deleted_at'];
+    protected $useSoftDeletes = true;
+    protected $deletedField = 'deleted_at';
+
+    protected $validationRules = [
+        'teacher_id' => 'required|is_not_unique[users.user_id]',
+        'class_id' => 'required|is_not_unique[class.class_id]',
+        'assigned_date' => 'permit_empty|valid_date',
+        'enrollment_term_id' => 'required|is_not_unique[enrollment_term.enrollment_term_id]'
+    ];
+
+    protected $validationMessages = [
+        'teacher_id' => [
+            'required' => 'The teacher ID is required.',
+            'is_not_unique' => 'The teacher ID must reference an existing user.'
+        ],
+        'class_id' => [
+            'required' => 'The class ID is required.',
+            'is_not_unique' => 'The class ID must reference an existing class.'
+        ],
+        'assigned_date' => [
+            'valid_date' => 'The assigned date must be a valid date.'
+        ],
+        'enrollment_term_id' => [
+            'required' => 'The term ID is required.',
+            'is_not_unique' => 'The term ID must reference an existing term.'
+        ]
+    ];
+
+    public function getAssignment($assignmentId, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->find($assignmentId);
+        }
+        return $this->find($assignmentId);
+    }
+
+    public function assignmentExists($assignmentId, $withDeleted = false)
+    {
+        $builder = $this->builder();
+        if ($withDeleted) {
+            $builder->withDeleted();
+        }
+        return $builder->where('assignment_id', $assignmentId)->get()->getRow() !== null;
+    }
+
+    public function createAssignment($assignmentData)
+    {
+        if (!$this->validate($assignmentData)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        $this->insert($assignmentData);
+        $assignmentId = $this->getInsertID();
+        return $this->select('assignment_id, teacher_id, class_id, enrollment_term_id')->find($assignmentId);
+    }
+
+    public function updateAssignment($assignmentId, $assignmentData)
+    {
+        $assignmentData['assignment_id'] = $assignmentId;
+        if (!$this->validate($assignmentData)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        unset($assignmentData['assignment_id']);
+        return $this->update($assignmentId, $assignmentData);
+    }
+
+    public function assignTeacher($teacherId, $classId, $termId)
+    {
+        $data = [
+            'teacher_id' => $teacherId,
+            'class_id' => $classId,
+            'enrollment_term_id' => $termId
+        ];
+        if (!$this->validate($data)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        $this->insert($data);
+        return $this->getInsertID();
+    }
+
+    public function getAssignedClasses($teacherId, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->where('teacher_id', $teacherId)->findAll();
+        }
+        return $this->where('teacher_id', $teacherId)->findAll();
+    }
+
+    public function isTeacherAssigned($teacherId, $classId, $withDeleted = false)
+    {
+        $builder = $this->builder();
+        if ($withDeleted) {
+            $builder->withDeleted();
+        }
+        return $builder->where('teacher_id', $teacherId)->where('class_id', $classId)->get()->getRow() !== null;
+    }
+
+    public function searchAssignments($searchTerm, $withDeleted = false)
+    {
+        $builder = $this->builder();
+        if ($withDeleted) {
+            $builder->withDeleted();
+        }
+        return $builder->like('assigned_date', $searchTerm)
+                       ->get()->getResultArray();
+    }
+
+    public function softDelete($assignmentId)
+    {
+        try {
+            $this->delete($assignmentId);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+
+    public function hardDelete($assignmentId)
+    {
+        try {
+            $this->onlyDeleted()->delete($assignmentId, true);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+
+    public function restore($assignmentId)
+    {
+        try {
+            $this->onlyDeleted()->update($assignmentId, ['deleted_at' => null]);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+}
+?>
+
+<?php
+
+namespace App\Models;
+
+use CodeIgniter\Model;
+
+class TrackerModel extends Model
+{
+    protected $table = 'trackers';
+    protected $primaryKey = 'tracker_id';
+    protected $allowedFields = ['tracker_name', 'tracker_description', 'tracker_type', 'status', 'deleted_at'];
+    protected $useSoftDeletes = true;
+    protected $deletedField = 'deleted_at';
+
+    protected $validationRules = [
+        'tracker_name' => 'required|is_unique[trackers.tracker_name,tracker_id,{tracker_id}]|max_length[255]',
+        'tracker_description' => 'permit_empty',
+        'tracker_type' => 'required|in_list[face,rfid]',
+        'status' => 'required|in_list[active,inactive]'
+    ];
+
+    protected $validationMessages = [
+        'tracker_name' => [
+            'required' => 'The tracker name is required.',
+            'is_unique' => 'The tracker name must be unique.',
+            'max_length' => 'The tracker name cannot exceed 255 characters.'
+        ],
+        'tracker_type' => [
+            'required' => 'The tracker type is required.',
+            'in_list' => 'The tracker type must be one of: face, rfid.'
+        ],
+        'status' => [
+            'required' => 'The status is required.',
+            'in_list' => 'The status must be one of: active, inactive.'
+        ]
+    ];
+
+    public function getTracker($trackerId, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->find($trackerId);
+        }
+        return $this->find($trackerId);
+    }
+
+    public function createTracker($trackerData)
+    {
+        if (!$this->validate($trackerData)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        $this->insert($trackerData);
+        $trackerId = $this->getInsertID();
+        return $this->find($trackerId);
+    }
+
+    public function updateTracker($trackerId, $trackerData)
+    {
+        $trackerData['tracker_id'] = $trackerId;
+        if (!$this->validate($trackerData)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        unset($trackerData['tracker_id']);
+        return $this->update($trackerId, $trackerData);
+    }
+
+    public function getActiveTrackers($withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->where('status', 'active')->findAll();
+        }
+        return $this->where('status', 'active')->findAll();
+    }
+
+    public function softDelete($trackerId)
+    {
+        try {
+            $this->delete($trackerId);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+
+    public function restore($trackerId)
+    {
+        try {
+            $this->onlyDeleted()->update($trackerId, ['deleted_at' => null]);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+}
+
+<?php
+
+namespace App\Models;
+
+use CodeIgniter\Model;
+
+class UserModel extends Model
+{
+    protected $table = 'users';
+    protected $primaryKey = 'user_id';
+    protected $allowedFields = [
+        'user_key', 'first_name', 'last_name', 'middle_name', 'birthday', 'password_hash',
+        'is_password_temporary', 'role', 'status', 'gender', 'bio', 'profile_picture', 'deleted_at' // Added is_password_temporary
+    ];
+    protected $useSoftDeletes = true;
+    protected $deletedField = 'deleted_at';
+
+    protected $validationRules = [
+        'user_key' => 'required|is_unique[users.user_key,user_id,{user_id}]|max_length[255]',
+        'first_name' => 'required|max_length[255]',
+        'last_name' => 'required|max_length[255]',
+        'middle_name' => 'permit_empty|max_length[255]',
+        'birthday' => 'permit_empty|valid_date',
+        'password_hash' => 'required|min_length[8]', // Kept min_length for consistency, but will bypass for reset
+        'is_password_temporary' => 'permit_empty|in_list[0,1]', // Added validation for new field
+        'role' => 'required|in_list[student,teacher,admin]',
+        'status' => 'required|in_list[active,pending,archived]',
+        'gender' => 'required|max_length[50]',
+        'bio' => 'permit_empty',
+        'profile_picture' => 'permit_empty|max_length[255]'
+    ];
+
+    protected $validationMessages = [
+        'user_key' => [
+            'required' => 'The user key is required.',
+            'is_unique' => 'The user key must be unique.',
+            'max_length' => 'The user key cannot exceed 255 characters.'
+        ],
+        'first_name' => [
+            'required' => 'The first name is required.',
+            'max_length' => 'The first name cannot exceed 255 characters.'
+        ],
+        'last_name' => [
+            'required' => 'The last name is required.',
+            'max_length' => 'The last name cannot exceed 255 characters.'
+        ],
+        'middle_name' => [
+            'max_length' => 'The middle name cannot exceed 255 characters.'
+        ],
+        'birthday' => [
+            'valid_date' => 'The birthday must be a valid date.'
+        ],
+        'password_hash' => [
+            'required' => 'The password is required.',
+            'min_length' => 'The password must be at least 8 characters long.'
+        ],
+        'is_password_temporary' => [
+            'in_list' => 'The temporary password flag must be 0 or 1.'
+        ],
+        'role' => [
+            'required' => 'The role is required.',
+            'in_list' => 'The role must be one of: student, teacher, admin.'
+        ],
+        'status' => [
+            'required' => 'The status is required.',
+            'in_list' => 'The status must be one of: student, teacher, admin.'
+        ],
+        'gender' => [
+            'required' => 'The gender is required.',
+            'max_length' => 'The gender cannot exceed 50 characters.'
+        ],
+        'profile_picture' => [
+            'max_length' => 'The profile picture path cannot exceed 255 characters.'
+        ]
+    ];
+
+    public function getUser($userId, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->find($userId);
+        }
+        return $this->find($userId);
+    }
+
+    public function userExists($userKey, $withDeleted = false)
+    {
+        $builder = $this->builder();
+        if ($withDeleted) {
+            $builder->withDeleted();
+        }
+        return $builder->where('user_key', $userKey)->get()->getRow() !== null;
+    }
+
+    public function authenticateUserByPassword($userKey, $password)
+    {
+        $user = $this->where('user_key', $userKey)->first();
+        if ($user) {
+            // Check if the password is temporary (plain-text)
+            if ($user['is_password_temporary'] == 1) {
+                // Compare plain-text password
+                if ($password === $user['password_hash']) {
+                    return [
+                        'user_id' => $user['user_id'],
+                        'first_name' => $user['first_name'],
+                        'role' => $user['role'],
+                        'profile_picture' => $user['profile_picture'],
+                        'status' => $user['status'],
+                        'is_password_temporary' => $user['is_password_temporary'] // Include for UI to prompt password change
+                    ];
+                }
+            } else {
+                // Compare hashed password
+                if (password_verify($password, $user['password_hash'])) {
+                    return [
+                        'user_id' => $user['user_id'],
+                        'first_name' => $user['first_name'],
+                        'role' => $user['role'],
+                        'profile_picture' => $user['profile_picture'],
+                        'status' => $user['status'],
+                        'is_password_temporary' => $user['is_password_temporary']
+                    ];
+                }
+            }
+        }
+        return false;
+    }
+
+    public function createUser($userData)
+    {
+        unset($userData['password_confirm']);
+        if (isset($userData['password'])) {
+            $userData['password_hash'] = $userData['password'];
+            unset($userData['password']);
+        }
+        if (!$this->validate($userData)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        // Always hash the password for new users, assume not temporary
+        if (isset($userData['password_hash'])) {
+            $userData['password_hash'] = password_hash($userData['password_hash'], PASSWORD_DEFAULT);
+            $userData['is_password_temporary'] = 0; // Set to non-temporary
+        }
+        $this->insert($userData);
+        $userId = $this->getInsertID();
+        return $this->select('user_id, first_name, role, profile_picture, status, is_password_temporary')->find($userId);
+    }
+
+    public function updateUser($userId, $userData)
+    {
+        $userData['user_id'] = $userId;
+        if (!$this->validate($userData)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        unset($userData['user_id']);
+        // If password_hash is provided, hash it and set is_password_temporary to 0
+        if (isset($userData['password_hash'])) {
+            $userData['password_hash'] = password_hash($userData['password_hash'], PASSWORD_DEFAULT);
+            $userData['is_password_temporary'] = 0;
+        }
+        return $this->update($userId, $userData);
+    }
+
+    public function resetPassword($userId, $newPassword)
+    {
+        // Store plain-text password and mark as temporary
+        $userData = [
+            'password_hash' => $newPassword,
+            'is_password_temporary' => 1
+        ];
+        // Bypass min_length validation for password reset
+        $this->validationRules['password_hash'] = 'required';
+        if (!$this->validate($userData)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        return $this->update($userId, $userData);
+    }
+
+    public function changePassword($userId, $oldPassword, $newPassword)
+    {
+        $user = $this->find($userId);
+        if ($user) {
+            // Check old password (plain-text or hashed)
+            $isValidOldPassword = $user['is_password_temporary'] == 1
+                ? $oldPassword === $user['password_hash']
+                : password_verify($oldPassword, $user['password_hash']);
+            if ($isValidOldPassword) {
+                $newHash = password_hash($newPassword, PASSWORD_DEFAULT);
+                return $this->update($userId, [
+                    'password_hash' => $newHash,
+                    'is_password_temporary' => 0 // Reset temporary flag
+                ]);
+            }
+        }
+        return false;
+    }
+
+    public function hasTemporaryPassword($userId)
+    {
+        $user = $this->find($userId);
+        return $user && $user['is_password_temporary'] == 1;
+    }
+
+    public function getUsersByRole($role, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->where('role', $role)->findAll();
+        }
+        return $this->where('role', $role)->findAll();
+    }
+
+    public function searchUsers($searchTerm, $withDeleted = false)
+    {
+        $builder = $this->builder();
+        if ($withDeleted) {
+            $builder->withDeleted();
+        }
+        return $builder->like('first_name', $searchTerm)
+                       ->orLike('last_name', $searchTerm)
+                       ->orLike('user_key', $searchTerm)
+                       ->get()->getResultArray();
+    }
+
+    public function softDelete($userId)
+    {
+        try {
+            $this->delete($userId);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+
+    public function hardDelete($userId)
+    {
+        try {
+            $this->onlyDeleted()->delete($userId, true);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+
+    public function restore($userId)
+    {
+        try {
+            $this->onlyDeleted()->update($userId, ['deleted_at' => null]);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+}
+<?php
+namespace App\Models;
+
+use CodeIgniter\Model;
+
+class NotificationsModel extends Model
+{
+    protected $table = 'notifications';
+    protected $primaryKey = 'notif_id';
+    protected $allowedFields = ['user_id', 'message', 'create_datetime', 'read_datetime', 'deleted_at'];
+    protected $useSoftDeletes = true;
+    protected $deletedField = 'deleted_at';
+
+    // Automatically set create_datetime on insert
+    protected $beforeInsert = ['setCreateDatetime'];
+
+    protected $validationRules = [
+        'user_id' => 'required|is_not_unique[users.user_id]',
+        'message' => 'required',
+        'create_datetime' => 'permit_empty|valid_date',
+        'read_datetime' => 'permit_empty|valid_date'
+    ];
+
+    protected $validationMessages = [
+        'user_id' => [
+            'required' => 'The user ID is required.',
+            'is_not_unique' => 'The user ID must reference an existing user.'
+        ],
+        'message' => [
+            'required' => 'The message is required.'
+        ],
+        'create_datetime' => [
+            'valid_date' => 'The creation datetime must be a valid date.'
+        ],
+        'read_datetime' => [
+            'valid_date' => 'The read datetime must be a valid date.'
+        ]
+    ];
+
+    // Callback to set create_datetime before insert
+    protected function setCreateDatetime(array $data)
+    {
+        if (!isset($data['data']['create_datetime'])) {
+            $data['data']['create_datetime'] = date('Y-m-d H:i:s');
+        }
+        return $data;
+    }
+
+    public function getNotification($notifId, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->find($notifId);
+        }
+        return $this->find($notifId);
+    }
+
+    public function notificationExists($notifId, $withDeleted = false)
+    {
+        $builder = $this->builder();
+        if ($withDeleted) {
+            $builder->withDeleted();
+        }
+        return $builder->where('notif_id', $notifId)->get()->getRow() !== null;
+    }
+
+    public function createNotification($notifData)
+    {
+        if (!$this->validate($notifData)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        $this->insert($notifData);
+        $notifId = $this->getInsertID();
+        return $this->select('notif_id, user_id, message, create_datetime, read_datetime')->find($notifId);
+    }
+
+    public function updateNotification($notifId, $notifData)
+    {
+        $notifData['notif_id'] = $notifId;
+        if (!$this->validate($notifData)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        unset($notifData['notif_id']);
+        return $this->update($notifId, $notifData);
+    }
+
+    // Get unread notifications (read_datetime is NULL)
+    public function getUnreadNotifications($userId, $withDeleted = false)
+    {
+        if ($withDeleted) {
+            return $this->withDeleted()->where('user_id', $userId)->where('read_datetime IS NULL')->findAll();
+        }
+        return $this->where('user_id', $userId)->where('read_datetime IS NULL')->findAll();
+    }
+
+    // Mark notification as read by setting read_datetime
+    public function markAsRead($notifId)
+    {
+        return $this->update($notifId, ['read_datetime' => date('Y-m-d H:i:s')]);
+    }
+
+    public function searchNotifications($searchTerm, $withDeleted = false)
+    {
+        $builder = $this->builder();
+        if ($withDeleted) {
+            $builder->withDeleted();
+        }
+        return $builder->like('message', $searchTerm)
+                       ->orLike('create_datetime', $searchTerm)
+                       ->get()->getResultArray();
+    }
+
+    public function softDelete($notifId)
+    {
+        try {
+            $this->delete($notifId);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+
+    public function hardDelete($notifId)
+    {
+        try {
+            $this->onlyDeleted()->delete($notifId, true);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+
+    public function restore($notifId)
+    {
+        try {
+            $this->onlyDeleted()->update($notifId, ['deleted_at' => null]);
+            return true;
+        } catch (\Exception $e) {
+            log_message('error', $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Bulk create notifications for multiple users.
+     *
+     * @param array $notifications Array of ['user_id' => int, 'message' => string]
+     * @return array ['success' => array, 'failed' => array]
+     */
+    public function bulkCreateNotifications(array $notifications)
+    {
+        $success = [];
+        $failed = [];
+        $userModel = new \App\Models\UserModel();
+
+        foreach ($notifications as $index => $notifData) {
+            try {
+                // Validate user exists
+                if (!$userModel->userExists($notifData['user_id'])) {
+                    $failed[] = "Notification $index: User ID {$notifData['user_id']} does not exist.";
+                    continue;
+                }
+
+                // Prepare data
+                $data = [
+                    'user_id' => $notifData['user_id'],
+                    'message' => $notifData['message'],
+                    'create_datetime' => date('Y-m-d H:i:s'), // Set explicitly for batch insert
+                    'read_datetime' => null
+                ];
+
+                if (!$this->validate($data)) {
+                    $failed[] = "Notification $index: " . implode(', ', $this->errors());
+                    continue;
+                }
+
+                $this->insert($data);
+                $notifId = $this->getInsertID();
+                $success[] = "Notification $index: Created for user {$notifData['user_id']} (ID: $notifId).";
+            } catch (\Exception $e) {
+                $failed[] = "Notification $index: " . $e->getMessage();
+            }
+        }
+
+        return ['success' => $success, 'failed' => $failed];
+    }
+
+    /**
+     * Bulk soft delete notifications by IDs.
+     *
+     * @param array $notifIds Array of notification IDs
+     * @return array ['success' => array, 'failed' => array]
+     */
+    public function bulkDeleteNotifications(array $notifIds)
+    {
+        $success = [];
+        $failed = [];
+
+        foreach ($notifIds as $notifId) {
+            try {
+                if (!$this->notificationExists($notifId)) {
+                    $failed[] = "Notification ID $notifId: Not found.";
+                    continue;
+                }
+
+                if ($this->softDelete($notifId)) {
+                    $success[] = "Notification ID $notifId: Deleted successfully.";
+                } else {
+                    $failed[] = "Notification ID $notifId: Failed to delete.";
+                }
+            } catch (\Exception $e) {
+                $failed[] = "Notification ID $notifId: " . $e->getMessage();
+            }
+        }
+
+        return ['success' => $success, 'failed' => $failed];
+    }
+}

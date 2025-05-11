@@ -1,0 +1,460 @@
+
+
+Prompt Builder for Student Attendance Management System (SAMS) in CI4
+System Overview
+Develop a Student Attendance Management System (SAMS) using CodeIgniter 4 with the following components:
+
+Homepage: Displays project details (scheduling, face recognition, attendance modes) and creators, with login/registration call-to-action.
+Authentication: Login, registration, and password reset functionality.
+Portals: Role-specific interfaces for students, teachers, and admins.
+UI Features:
+Dark blue theme (#1E3A8A).
+Logo (logo.png) in navbar and footer.
+Attendance visualizations (Chart.js: pie, line, bar).
+Leave requests with datetime ranges.
+Daily/weekly/monthly schedules with room/teacher details.
+Bulk enrollment via CSV.
+Notification popups for unread messages.
+DataTables with search, sort, pagination (no export).
+Dark mode toggle (UI-only, stored in local storage).
+Errors as auto-destroying pop-up notifications.
+Directory Structure
+text
+
+Collapse
+
+Wrap
+
+Copy
+app/
+├── Controllers/
+│   ├── HomeController.php
+│   ├── AuthController.php
+│   ├── StudentController.php
+│   ├── TeacherController.php
+│   └── AdminController.php
+├── Views/
+│   ├── auth/
+│   │   ├── login.php
+│   │   ├── register.php
+│   │   └── forgot_password.php
+│   ├── student/
+│   │   ├── dashboard.php
+│   │   ├── classes.php
+│   │   ├── class_detail.php
+│   │   ├── attendance.php
+│   │   ├── schedule.php
+│   │   ├── profile.php
+│   │   └── leave_requests.php
+│   ├── teacher/
+│   │   ├── dashboard.php
+│   │   ├── classes.php
+│   │   ├── class_detail.php
+│   │   ├── leave_requests.php
+│   │   ├── schedule.php
+│   │   ├── reports.php
+│   │   └── profile.php
+│   ├── admin/
+│   │   ├── dashboard.php
+│   │   ├── users.php
+│   │   ├── students.php
+│   │   ├── teachers.php
+│   │   ├── classes.php
+│   │   ├── subjects.php
+│   │   ├── enrollment_terms.php
+│   │   ├── student_assignments.php
+│   │   ├── teacher_assignments.php
+│   │   ├── rooms.php
+│   │   ├── trackers.php
+│   │   ├── notifications.php
+│   │   ├── class_sessions.php
+│   │   ├── class_session_settings.php
+│   │   ├── attendance.php
+│   │   ├── leave_requests.php
+│   │   ├── schedule.php
+│   │   └── profile_settings.php
+│   ├── layouts/
+│   │   ├── main.php
+│   │   ├── sidebar_student.php
+│   │   ├── sidebar_teacher.php
+│   │   └── sidebar_admin.php
+│   ├── components/
+│   │   ├── datatable.php
+│   │   ├── modal.php
+│   │   ├── form.php
+│   │   └── notification_popup.php
+│   └── home.php
+public/
+├── assets/
+│   ├── css/
+│   │   └── bootstrap.css
+│   ├── js/
+│   │   ├── chart.js
+│   │   ├── fullcalendar.js
+│   │   ├── datatables.js
+│   │   └── jquery  
+│   └── img/
+│       └── logo.png
+Controllers Pseudocode
+HomeController
+php
+
+Copy
+class HomeController extends BaseController {
+    public function index() {
+        // Render homepage with project details (scheduling, face recognition, attendance modes) and creators
+        // Data: static content
+        return view('home');
+    }
+}
+AuthController
+php
+
+Copy
+class AuthController extends BaseController {
+    public function login() {
+        // Handle login form POST, validate with UserModel::authenticateUserByPassword
+        // Set session (user_id, role), redirect by role (/student, /teacher, /admin)
+        // Display login view on GET
+        return view('auth/login');
+    }
+
+    public function register() {
+        // Handle registration form POST, create user with UserModel::createUser
+        // Redirect to login on success
+        // Display register view on GET
+        return view('auth/register');
+    }
+
+    public function forgotPassword() {
+        // Handle password reset form POST, update with UserModel::resetPassword
+        // Redirect to login on success
+        // Display forgot password view on GET
+        return view('auth/forgot_password');
+    }
+
+    public function logout() {
+        // Destroy session, redirect to homepage
+        return redirect()->to('/');
+    }
+}
+StudentController
+php
+
+Copy
+class StudentController extends BaseController {
+    public function index() {
+        // Fetch today’s sessions (ClassSessionModel), attendance rate (AttendanceModel), notifications (NotificationsModel)
+        // Render dashboard
+        return view('student/dashboard');
+    }
+
+    public function classes() {
+        // Fetch enrolled classes (StudentAssignmentModel, ClassModel)
+        // Render class tiles
+        return view('student/classes');
+    }
+
+    public function classDetail($classId) {
+        // Fetch class details (ClassModel), sessions (ClassSessionModel), attendance (AttendanceModel), leave requests (AttendanceLeaveModel)
+        // Render tabs: Attendance, Sessions, Leave Requests, History
+        return view('student/class_detail');
+    }
+
+    public function attendance() {
+        // Fetch attendance logs (AttendanceModel) with filters (date, class, status)
+        // Render list view
+        return view('student/attendance');
+    }
+
+    public function schedule() {
+        // Fetch schedule (ScheduleModel) with toggle (day/week/month)
+        // Render calendar
+        return view('student/schedule');
+    }
+
+    public function profile() {
+        // Fetch user data (UserModel), handle profile update POST
+        // Render editable modal
+        return view('student/profile');
+    }
+
+    public function leaveRequests() {
+        // Fetch leave requests (AttendanceLeaveModel), handle new/edit/cancel POST
+        // Render tiles with form modal
+        return view('student/leave_requests');
+    }
+}
+TeacherController
+php
+
+Copy
+class TeacherController extends BaseController {
+    public function index() {
+        // Fetch today’s sessions (ClassSessionModel), pending leaves (AttendanceLeaveModel)
+        // Render dashboard with tiles and alerts
+        return view('teacher/dashboard');
+    }
+
+    public function classes() {
+        // Fetch assigned classes (TeacherAssignmentModel, ClassModel)
+        // Render class tiles
+        return view('teacher/classes');
+    }
+
+    public function classDetail($classId) {
+        // Fetch class details (ClassModel), roster (StudentAssignmentModel), sessions (ClassSessionModel), attendance (AttendanceModel)
+        // Render tabs: Roster, Sessions, Attendance
+        return view('teacher/class_detail');
+    }
+
+    public function leaveRequests() {
+        // Fetch leave requests (AttendanceLeaveModel), handle approve/reject POST
+        // Render tiles with actions
+        return view('teacher/leave_requests');
+    }
+
+    public function schedule() {
+        // Fetch teaching schedule (ScheduleModel) with toggle (day/week)
+        // Render calendar
+        return view('teacher/schedule');
+    }
+
+    public function reports() {
+        // Fetch attendance data (AttendanceModel) with filters (class, date)
+        // Render charts and tables
+        return view('teacher/reports');
+    }
+
+    public function profile() {
+        // Fetch user data (UserModel), handle profile update POST
+        // Render editable modal
+        return view('teacher/profile');
+    }
+}
+AdminController
+php
+
+Copy
+class AdminController extends BaseController {
+    public function index() {
+        // Fetch metrics (UserModel, ClassModel, AttendanceLeaveModel, ClassSessionModel)
+        // Render dashboard with tiles
+        return view('admin/dashboard');
+    }
+
+    public function users() {
+        // Fetch users (UserModel), handle CRUD POST
+        // Render DataTable
+        return view('admin/users');
+    }
+
+    public function students() {
+        // Fetch students (UserModel where role=student), handle CRUD POST
+        // Render DataTable
+        return view('admin/students');
+    }
+
+    public function teachers() {
+        // Fetch teachers (UserModel where role=teacher), handle CRUD POST
+        // Render DataTable
+        return view('admin/teachers');
+    }
+
+    public function classes() {
+        // Fetch classes (ClassModel), handle CRUD POST
+        // Render DataTable
+        return view('admin/classes');
+    }
+
+    public function subjects() {
+        // Fetch subjects (SubjectModel), handle CRUD POST
+        // Render DataTable
+        return view('admin/subjects');
+    }
+
+    public function enrollmentTerms() {
+        // Fetch terms (EnrollmentTermModel), handle CRUD POST
+        // Render DataTable
+        return view('admin/enrollment_terms');
+    }
+
+    public function studentAssignments() {
+        // Fetch assignments (StudentAssignmentModel), handle individual/bulk POST (CSV upload)
+        // Render tabs and DataTable
+        return view('admin/student_assignments');
+    }
+
+    public function teacherAssignments() {
+        // Fetch assignments (TeacherAssignmentModel), handle CRUD POST
+        // Render DataTable
+        return view('admin/teacher_assignments');
+    }
+
+    public function rooms() {
+        // Fetch rooms (RoomModel), handle CRUD POST
+        // Render DataTable
+        return view('admin/rooms');
+    }
+
+    public function trackers() {
+        // Fetch trackers (TrackerModel), handle CRUD POST
+        // Render DataTable
+        return view('admin/trackers');
+    }
+
+    public function notifications() {
+        // Fetch notifications (NotificationsModel), handle CRUD/mark read POST
+        // Render DataTable
+        return view('admin/notifications');
+    }
+
+    public function classSessions() {
+        // Fetch sessions (ClassSessionModel), handle CRUD POST
+        // Render tiles
+        return view('admin/class_sessions');
+    }
+
+    public function classSessionSettings() {
+        // Fetch settings (ClassSessionSettingsModel), handle CRUD POST
+        // Render DataTable
+        return view('admin/class_session_settings');
+    }
+
+    public function attendance() {
+        // Fetch attendance (AttendanceModel), handle CRUD POST
+        // Render tiles and grid
+        return view('admin/attendance');
+    }
+
+    public function leaveRequests() {
+        // Fetch leave requests (AttendanceLeaveModel), handle approve/reject POST
+        // Render tiles
+        return view('admin/leave_requests');
+    }
+
+    public function schedule() {
+        // Fetch schedules (ScheduleModel), handle CRUD POST
+        // Render calendar
+        return view('admin/schedule');
+    }
+
+    public function profileSettings() {
+        // Fetch user data (UserModel), handle profile update POST
+        // Render editable modal
+        return view('admin/profile_settings');
+    }
+}
+Views Pseudocode
+layouts/main.php
+php
+
+Copy
+<!DOCTYPE html>
+<html>
+<head>
+    <!-- Meta, title, Tailwind CSS, Chart.js, FullCalendar, DataTables.js -->
+    <style>body { background: #F3F4F6; color: #1E3A8A; } [data-theme="dark"] { background: #1E3A8A; color: #F3F4F6; }</style>
+</head>
+<body id="theme" data-theme="light">
+    <nav class="bg-blue-900 text-white p-4 flex justify-between">
+        <!-- Logo (40px), role-specific links -->
+    </nav>
+    <div class="flex min-h-screen">
+        <!-- Include role-specific sidebar if logged in -->
+        <main class="flex-1 p-6">
+            <!-- Render content section -->
+        </main>
+    </div>
+    <!-- Notification popup (if logged in) -->
+    <footer class="bg-blue-900 text-white p-4 text-center">
+        <!-- Logo, © 2025 -->
+    </footer>
+    <script>
+        // Dark mode toggle, store in localStorage
+        function toggleTheme() {
+            const body = document.getElementById('theme');
+            body.dataset.theme = body.dataset.theme === 'light' ? 'dark' : 'light';
+            localStorage.setItem('theme', body.dataset.theme);
+        }
+        // Load theme from localStorage on page load
+    </script>
+</body>
+</html>
+home.php
+php
+
+Copy
+<?php $this->extend('layouts/main'); ?>
+<?php $this->section('content'); ?>
+    <!-- Hero: SAMS title, description (scheduling, face recognition, attendance modes), login button -->
+    <!-- Project details section -->
+    <!-- Creators section -->
+<?php $this->endSection(); ?>
+auth/login.php
+php
+
+Copy
+<?php $this->extend('layouts/main'); ?>
+<?php $this->section('content'); ?>
+    <!-- Form: user_key, password, submit -->
+    <!-- Flash error popup -->
+<?php $this->endSection(); ?>
+student/dashboard.php
+php
+
+Copy
+<?php $this->extend('layouts/main'); ?>
+<?php $this->section('content'); ?>
+    <!-- Tiles: Today’s Classes (list), Attendance Rate (percentage, sparkline), Notifications (count, view button) -->
+<?php $this->endSection(); ?>
+student/class_detail.php
+php
+
+Copy
+<?php $this->extend('layouts/main'); ?>
+<?php $this->section('content'); ?>
+    <!-- Header: Class name, teacher -->
+    <!-- Tabs: Attendance (pie chart), Sessions (tiles), Leave Requests (tiles, modal), History (table) -->
+<?php $this->endSection(); ?>
+teacher/dashboard.php
+php
+
+Copy
+<?php $this->extend('layouts/main'); ?>
+<?php $this->section('content'); ?>
+    <!-- Tiles: Today’s Sessions (list, actions), Alerts (pending leaves, sessions) -->
+<?php $this->endSection(); ?>
+admin/student_assignments.php
+php
+
+Copy
+<?php $this->extend('layouts/main'); ?>
+<?php $this->section('content'); ?>
+    <!-- Tabs: Individual (form), Bulk (CSV upload form) -->
+    <!-- DataTable: assignments -->
+<?php $this->endSection(); ?>
+components/notification_popup.php
+php
+
+Copy
+<!-- Popup: unread notifications list, mark as read links, auto-destroy after 5s -->
+components/datatable.php
+php
+
+Copy
+<!-- Table: dynamic columns, data -->
+<!-- Search, pagination, sorting (no export) -->
+Additional Notes
+Styling: Use Bootstrap CSS with the given theme of light/dark modes (see example of layout/main.php or main.php as attached)
+Errors: Display via flashdata as popups with 5s timeout.
+Models: Leverage provided models (e.g., AttendanceModel, ClassSessionModel) for data operations.
+Assets: Include Chart.js, FullCalendar, DataTables.js for visualizations and tables.
+
+Example viewpage: layout/main.php ... (create different layout/student.php, and layout/admin etc..) to which have content variable that uses expand() ci4 etc...
+
+--------------
+Tasks Done: (created HompageController, views/layout/main, views/home)..
+Up next: AuthController, Auth Views, Routes, i want also to have dyamic url of auth/(:segment)/(:segment) = AuthController::index/$1/$1,
+auth/ will show option for chosing a role...
+auth/role will show option for login or register...
