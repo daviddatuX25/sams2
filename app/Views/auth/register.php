@@ -1,6 +1,6 @@
 <?php $this->extend('layouts/main'); ?>
 <?php $this->section('content'); ?>
-<div class="container d-flex justify-content-center align-items-center h-100">
+<div style="min-height: 75vh" class="container d-flex flex-column justify-content-center align-items-center ">
     <div class="row justify-content-center w-100">
         <div class="col-11 col-md-8 col-lg-6 col-xl-5">
             <div class="card">

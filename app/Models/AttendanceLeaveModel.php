@@ -106,6 +106,16 @@ class AttendanceLeaveModel extends Model
         return $this->update($leaveId, ['status' => 'rejected', 'datetimestamp_resolved' => date('Y-m-d H:i:s')]);
     }
 
+    public function getPendingLeaveRequestsCountForTeacher($teacherId)
+    {
+        return $this->select('attendance_leave.*')
+            ->join('student_assignment', 'student_assignment.student_id = attendance_leave.user_id')
+            ->join('teacher_assignment', 'teacher_assignment.class_id = student_assignment.class_id')
+            ->where('teacher_assignment.teacher_id', $teacherId)
+            ->where('attendance_leave.status', 'pending')
+            ->countAllResults();
+    }
+
     public function searchLeaves($searchTerm, $withDeleted = false)
     {
         $builder = $this->builder();

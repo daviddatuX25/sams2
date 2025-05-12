@@ -6,8 +6,14 @@ use CodeIgniter\Controller;
 
 class AuthController extends BaseController
 {
+
     public function index($role = null, $action = null)
     {
+        if (session()->get('isLoggedIn')) {
+            $role = session()->get('role');
+            return redirect()->to($role . '/');
+        }
+
         if (!$role) {
             return view('auth/index', ['navbar' => 'home']);
         } elseif (!$action) {
@@ -32,7 +38,10 @@ class AuthController extends BaseController
             $password = $this->request->getPost('password');
             $userModel = new UserModel();
             $user = $userModel->authenticateUserByPassword($userKey, $password);
-
+            if($role != $user['role']) {
+                session()->setFlashdata('error', 'User is not authorized for this role');
+                return redirect()->back();
+            }
             if ($user && $user['status'] === 'active') {
                 session()->set([
                     'user_id' => $user['user_id'],
@@ -41,6 +50,8 @@ class AuthController extends BaseController
                     'profile_picture' => $user['profile_picture'],
                     'isLoggedIn' => true
                 ]);
+                session()->setFlashdata('success_notification', 'Welcome, ' . $user['first_name']);
+                
                 switch ($user['role']) {
                     case 'student':
                         return redirect()->to('/student');
@@ -49,6 +60,7 @@ class AuthController extends BaseController
                     case 'admin':
                         return redirect()->to('/admin');
                     default:
+                        session()->remove('success_notification');
                         return redirect()->to('/');
                 }
             } else {
@@ -86,11 +98,11 @@ class AuthController extends BaseController
             if ($user) {
                 $newPassword = bin2hex(random_bytes(8));
                 $userModel->resetPassword($user['user_id'], $newPassword);
-                session()->setFlashdata('success', 'Password reset successful. Check your email.');
+                session()->setFlashdata('success', 'Password reset successful. Contact Administrator to get new password.');
                 return redirect()->to('/auth');
             } else {
                 session()->setFlashdata('error', 'User not found');
-                return redirect()->to('/auth/forgot_password');
+                return redirect()->to('auth/forgot_password');
             }
         }
         return view('auth/forgot_password', ['navbar' => 'home']);

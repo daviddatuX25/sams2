@@ -135,6 +135,11 @@ class StudentAssignmentModel extends Model
         return ['success' => $success, 'failed' => $failed];
     }
 
+    public function getClassIdsForStudent($studentId)
+    {
+        return $this->where('student_id', $studentId)->findColumn('class_id') ?? [];
+    }
+
     public function softDelete($enrollmentId)
     {
         try {

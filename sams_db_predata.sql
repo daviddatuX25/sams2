@@ -41,8 +41,8 @@ INSERT INTO `attendance_logs` (`user_id`, `class_session_id`, `tracker_id`, `act
 (3, 1, 1, 'time_in', '2024-08-05 08:05:00');
 
 -- 11. Insert into `attendance`
-INSERT INTO `attendance` (`user_id`, `class_session_id`, `status`) VALUES
-(3, 1, 'present');
+INSERT INTO `attendance` (`user_id`, `class_session_id`, `status`, `marked_at`) VALUES
+(3, 1, 'present', '2024-08-05 08:30:00');
 
 -- 12. Insert into `attendance_leave`
 INSERT INTO `attendance_leave` (`user_id`, `status`, `letter`, `datetimestamp_created`, `datetimestamp_reviewed`, `datetimestamp_resolved`, `deleted_at`) VALUES

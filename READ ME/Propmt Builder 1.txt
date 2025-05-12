@@ -75,9 +75,11 @@ app/
 │   │   └── profile_settings.php
 │   ├── layouts/
 │   │   ├── main.php
-│   │   ├── sidebar_student.php
-│   │   ├── sidebar_teacher.php
-│   │   └── sidebar_admin.php
+│   │   ├── admin.php
+│   │   └── partials/
+│   │       ├──adminNav.php
+│   │       ├──studentNav.php
+│   │       └──teacherNav.php
 │   ├── components/
 │   │   ├── datatable.php
 │   │   ├── modal.php
@@ -87,14 +89,14 @@ app/
 public/
 ├── assets/
 │   ├── css/
-│   │   └── bootstrap.css
+│   │   └── bootstrap.css (cdn temporary)
 │   ├── js/
 │   │   ├── chart.js
 │   │   ├── fullcalendar.js
 │   │   ├── datatables.js
 │   │   └── jquery  
 │   └── img/
-│       └── logo.png
+│       └── white-on-trans.png
 Controllers Pseudocode
 HomeController
 php
@@ -111,33 +113,111 @@ AuthController
 php
 
 Copy
-class AuthController extends BaseController {
-    public function login() {
-        // Handle login form POST, validate with UserModel::authenticateUserByPassword
-        // Set session (user_id, role), redirect by role (/student, /teacher, /admin)
-        // Display login view on GET
-        return view('auth/login');
+<?php
+namespace App\Controllers;
+
+use App\Models\UserModel;
+use CodeIgniter\Controller;
+
+class AuthController extends BaseController
+{
+    public function index($role = null, $action = null)
+    {
+        if (!$role) {
+            return view('auth/index', ['navbar' => 'home']);
+        } elseif (!$action) {
+            return view('auth/role_action', ['role' => $role, 'navbar' => 'home']);
+        } else {
+            switch ($action) {
+                case 'login':
+                    return $this->login($role);
+                case 'register':
+                    return $this->register($role);
+                default:
+                    session()->setFlashdata('error', 'Invalid action');
+                    return redirect()->to('/auth');
+            }
+        }
     }
 
-    public function register() {
-        // Handle registration form POST, create user with UserModel::createUser
-        // Redirect to login on success
-        // Display register view on GET
-        return view('auth/register');
+    private function login($role = null)
+    {
+        if ($this->request->getMethod() === 'POST') {
+            $userKey = $this->request->getPost('user_key');
+            $password = $this->request->getPost('password');
+            $userModel = new UserModel();
+            $user = $userModel->authenticateUserByPassword($userKey, $password);
+
+            if ($user && $user['status'] === 'active') {
+                session()->set([
+                    'user_id' => $user['user_id'],
+                    'role' => $user['role'],
+                    'first_name' => $user['first_name'],
+                    'profile_picture' => $user['profile_picture'],
+                    'isLoggedIn' => true
+                ]);
+                switch ($user['role']) {
+                    case 'student':
+                        return redirect()->to('/student');
+                    case 'teacher':
+                        return redirect()->to('/teacher');
+                    case 'admin':
+                        return redirect()->to('/admin');
+                    default:
+                        return redirect()->to('/');
+                }
+            } else {
+                session()->setFlashdata('error', 'Invalid credentials or inactive account');
+                return redirect()->to($role ? "auth/{$role}/login" : '/auth');
+            }
+        }
+        return view('auth/login', ['role' => $role, 'navbar' => 'home']);
     }
 
-    public function forgotPassword() {
-        // Handle password reset form POST, update with UserModel::resetPassword
-        // Redirect to login on success
-        // Display forgot password view on GET
-        return view('auth/forgot_password');
+    private function register($role = null)
+    {
+        if ($this->request->getMethod() === 'POST') {
+            $userData = $this->request->getPost();
+            $userModel = new UserModel();
+            try {
+                $userData['role'] = $role ?? $userData['role'];
+                $newUser = $userModel->createUser($userData);
+                session()->setFlashdata('success', 'Registration successful. Please login.');
+                return redirect()->to('/auth/' . $newUser['role'] . '/login');
+            } catch (\Exception $e) {
+                session()->setFlashdata('error', $e->getMessage());
+                return redirect()->to($role ? "/auth/{$role}/register" : '/auth');
+            }
+        }
+        return view('auth/register', ['role' => $role ?? 'student', 'navbar' => 'home']);
     }
 
-    public function logout() {
-        // Destroy session, redirect to homepage
+    public function forgotPassword()
+    {
+        if ($this->request->getMethod() === 'POST') {
+            $userKey = $this->request->getPost('user_key');
+            $userModel = new UserModel();
+            $user = $userModel->where('user_key', $userKey)->first();
+            if ($user) {
+                $newPassword = bin2hex(random_bytes(8));
+                $userModel->resetPassword($user['user_id'], $newPassword);
+                session()->setFlashdata('success', 'Password reset successful. Check your email.');
+                return redirect()->to('/auth');
+            } else {
+                session()->setFlashdata('error', 'User not found');
+                return redirect()->to('/auth/forgot_password');
+            }
+        }
+        return view('auth/forgot_password', ['navbar' => 'home']);
+    }
+
+    public function logout()
+    {
+        session()->destroy();
         return redirect()->to('/');
     }
 }
+
 StudentController
 php
 

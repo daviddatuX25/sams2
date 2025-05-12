@@ -175,6 +175,7 @@ CREATE TABLE `attendance` (
   `user_id` int(10) UNSIGNED NOT NULL,
   `class_session_id` int(10) UNSIGNED NOT NULL,
   `status` enum('present','absent','late','unmarked') NOT NULL DEFAULT 'unmarked',
+  `marked_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`attendance_id`),
   UNIQUE KEY `idx_unique_attendance` (`user_id`,`class_session_id`),
   KEY `idx_attendance_session` (`class_session_id`),

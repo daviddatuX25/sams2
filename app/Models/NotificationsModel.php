@@ -54,6 +54,11 @@ class NotificationsModel extends Model
         return $this->find($notifId);
     }
 
+    public function getUnreadCount($userId)
+    {
+        return $this->where('user_id', $userId)->where('read_datetime IS NULL')->countAllResults();
+    }
+
     public function notificationExists($notifId, $withDeleted = false)
     {
         $builder = $this->builder();

@@ -144,6 +144,23 @@ class ClassSessionModel extends Model
                        ->get()->getResultArray();
     }
 
+    public function getTodaySessionsForUser($userId, $role = 'student')
+    {
+        $assignmentTable = $role === 'student' ? 'student_assignment' : 'teacher_assignment';
+        $userField = $role === 'student' ? 'student_id' : 'teacher_id';
+
+        $classIds = $this->db->table($assignmentTable)->where($userField, $userId)->get()->getResultArray();
+        $classIds = array_column($classIds, 'class_id');
+
+        if (empty($classIds)) {
+            return [];
+        }
+
+        return $this->whereIn('class_id', $classIds)
+            ->where('DATE(open_datetime)', date('Y-m-d'))
+            ->findAll();
+    }
+
     public function softDelete($sessionId)
     {
         try {

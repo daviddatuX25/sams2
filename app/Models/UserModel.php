@@ -10,23 +10,23 @@ class UserModel extends Model
     protected $primaryKey = 'user_id';
     protected $allowedFields = [
         'user_key', 'first_name', 'last_name', 'middle_name', 'birthday', 'password_hash',
-        'is_password_temporary', 'role', 'status', 'gender', 'bio', 'profile_picture', 'deleted_at' // Added is_password_temporary
+        'is_password_temporary', 'role', 'status', 'gender', 'bio', 'profile_picture', 'deleted_at'
     ];
     protected $useSoftDeletes = true;
     protected $deletedField = 'deleted_at';
 
     protected $validationRules = [
-        'user_key' => 'required|is_unique[users.user_key,user_id,{user_id}]|max_length[255]',
+        'user_key' => 'required|is_unique[users.user_key]|max_length[255]',
         'first_name' => 'required|max_length[255]',
         'last_name' => 'required|max_length[255]',
         'middle_name' => 'permit_empty|max_length[255]',
         'birthday' => 'permit_empty|valid_date',
-        'password_hash' => 'required|min_length[8]', // Kept min_length for consistency, but will bypass for reset
-        'is_password_temporary' => 'permit_empty|in_list[0,1]', // Added validation for new field
+        'password_hash' => 'required|min_length[8]',
+        'is_password_temporary' => 'permit_empty|in_list[0,1]',
         'role' => 'required|in_list[student,teacher,admin]',
         'status' => 'required|in_list[active,pending,archived]',
-        'gender' => 'required|max_length[50]',
-        'bio' => 'permit_empty',
+        'gender' => 'required|in_list[male,female,other]',
+        'bio' => 'permit_empty|max_length[500]',
         'profile_picture' => 'permit_empty|max_length[255]'
     ];
 
@@ -63,16 +63,64 @@ class UserModel extends Model
         ],
         'status' => [
             'required' => 'The status is required.',
-            'in_list' => 'The status must be one of: student, teacher, admin.'
+            'in_list' => 'The status must be one of: active, pending, archived.'
         ],
         'gender' => [
             'required' => 'The gender is required.',
-            'max_length' => 'The gender cannot exceed 50 characters.'
+            'in_list' => 'The gender must be one of: male, female, other.'
+        ],
+        'bio' => [
+            'max_length' => 'The bio cannot exceed 500 characters.'
         ],
         'profile_picture' => [
             'max_length' => 'The profile picture path cannot exceed 255 characters.'
         ]
     ];
+
+    public function isUserKeyUnique($userKey, $excludeUserId = null)
+    {
+        $builder = $this->select('user_key')->where('user_key', $userKey);
+        if ($excludeUserId) {
+            $builder->where('user_id !=', $excludeUserId);
+        }
+        return $builder->get()->getRow() === null;
+    }
+
+    public function updateProfile($userId, $userData)
+    {
+        if(!$this->isUserKeyUnique($userData['user_key'])){
+            unset($userData['user_key']);
+        }
+        unset($userData['user_id']);
+        return $this->update($userId, $userData);
+    }
+
+    public function updateProfilePicture($userId, $photoPath)
+    {
+        $data = ['profile_picture' => $photoPath];
+        if (!$this->validate($data)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        return $this->update($userId, $data);
+    }
+
+    public function changePassword($userId, $oldPassword, $newPassword)
+    {
+        $user = $this->find($userId);
+        if ($user) {
+            $isValidOldPassword = $user['is_password_temporary'] == 1
+                ? $oldPassword === $user['password_hash']
+                : password_verify($oldPassword, $user['password_hash']);
+            if ($isValidOldPassword) {
+                $newHash = password_hash($newPassword, PASSWORD_DEFAULT);
+                return $this->update($userId, [
+                    'password_hash' => $newHash,
+                    'is_password_temporary' => 0
+                ]);
+            }
+        }
+        return false;
+    }
 
     public function getUser($userId, $withDeleted = false)
     {
@@ -80,6 +128,19 @@ class UserModel extends Model
             return $this->withDeleted()->find($userId);
         }
         return $this->find($userId);
+    }
+
+     public function getUsers($limit = null, $offset = 0, $search = null)
+    {
+        $builder = $this->builder();
+
+        if ($search) {
+            $builder->like('first_name', $search)
+                ->orLike('last_name', $search)
+                ->orLike('user_key', $search);
+        }
+
+        return $builder->get($limit, $offset)->getResultArray();
     }
 
     public function userExists($userKey, $withDeleted = false)
@@ -91,13 +152,24 @@ class UserModel extends Model
         return $builder->where('user_key', $userKey)->get()->getRow() !== null;
     }
 
+    public function getTotalUsers($search = null)
+    {
+        $builder = $this->builder();
+
+        if ($search) {
+            $builder->like('first_name', $search)
+                ->orLike('last_name', $search)
+                ->orLike('user_key', $search);
+        }
+
+        return $builder->countAllResults();
+    }
+
     public function authenticateUserByPassword($userKey, $password)
     {
         $user = $this->where('user_key', $userKey)->first();
         if ($user) {
-            // Check if the password is temporary (plain-text)
             if ($user['is_password_temporary'] == 1) {
-                // Compare plain-text password
                 if ($password === $user['password_hash']) {
                     return [
                         'user_id' => $user['user_id'],
@@ -105,11 +177,10 @@ class UserModel extends Model
                         'role' => $user['role'],
                         'profile_picture' => $user['profile_picture'],
                         'status' => $user['status'],
-                        'is_password_temporary' => $user['is_password_temporary'] // Include for UI to prompt password change
+                        'is_password_temporary' => $user['is_password_temporary']
                     ];
                 }
             } else {
-                // Compare hashed password
                 if (password_verify($password, $user['password_hash'])) {
                     return [
                         'user_id' => $user['user_id'],
@@ -135,10 +206,9 @@ class UserModel extends Model
         if (!$this->validate($userData)) {
             throw new \Exception(implode(', ', $this->errors()));
         }
-        // Always hash the password for new users, assume not temporary
         if (isset($userData['password_hash'])) {
             $userData['password_hash'] = password_hash($userData['password_hash'], PASSWORD_DEFAULT);
-            $userData['is_password_temporary'] = 0; // Set to non-temporary
+            $userData['is_password_temporary'] = 0;
         }
         $this->insert($userData);
         $userId = $this->getInsertID();
@@ -152,7 +222,6 @@ class UserModel extends Model
             throw new \Exception(implode(', ', $this->errors()));
         }
         unset($userData['user_id']);
-        // If password_hash is provided, hash it and set is_password_temporary to 0
         if (isset($userData['password_hash'])) {
             $userData['password_hash'] = password_hash($userData['password_hash'], PASSWORD_DEFAULT);
             $userData['is_password_temporary'] = 0;
@@ -162,36 +231,15 @@ class UserModel extends Model
 
     public function resetPassword($userId, $newPassword)
     {
-        // Store plain-text password and mark as temporary
         $userData = [
             'password_hash' => $newPassword,
             'is_password_temporary' => 1
         ];
-        // Bypass min_length validation for password reset
         $this->validationRules['password_hash'] = 'required';
         if (!$this->validate($userData)) {
             throw new \Exception(implode(', ', $this->errors()));
         }
         return $this->update($userId, $userData);
-    }
-
-    public function changePassword($userId, $oldPassword, $newPassword)
-    {
-        $user = $this->find($userId);
-        if ($user) {
-            // Check old password (plain-text or hashed)
-            $isValidOldPassword = $user['is_password_temporary'] == 1
-                ? $oldPassword === $user['password_hash']
-                : password_verify($oldPassword, $user['password_hash']);
-            if ($isValidOldPassword) {
-                $newHash = password_hash($newPassword, PASSWORD_DEFAULT);
-                return $this->update($userId, [
-                    'password_hash' => $newHash,
-                    'is_password_temporary' => 0 // Reset temporary flag
-                ]);
-            }
-        }
-        return false;
     }
 
     public function hasTemporaryPassword($userId)
