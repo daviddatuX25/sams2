@@ -11,7 +11,7 @@ use App\Models\ClassModel;
 use App\Models\AttendanceLeaveModel;
 use CodeIgniter\Controller;
 
-class StudentController extends Controller
+class StudentController extends BaseController
 {
     protected $userModel;
     protected $studentAssignmentModel;
@@ -37,9 +37,6 @@ class StudentController extends Controller
     public function index()
     {
         $userId = session()->get('user_id');
-        if (!$userId) {
-            return redirect()->to('/login')->with('error', 'Please log in.');
-        }
 
         $user = $this->userModel->find($userId);
         if ($user && $user['is_password_temporary'] == 1) {
@@ -85,9 +82,6 @@ class StudentController extends Controller
     public function classDetail($classId)
     {
         $userId = session()->get('user_id');
-        if (!$userId) {
-            return redirect()->to('/login')->with('error', 'Please log in.');
-        }
 
         if (!$this->studentAssignmentModel->isStudentEnrolled($userId, $classId)) {
             session()->setFlashdata('error_notification', 'You are not enrolled in this class.');

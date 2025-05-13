@@ -6,6 +6,7 @@
         <div class="mb-3">
             <a href="<?= site_url('teacher/schedule?view=day') ?>" class="btn btn-primary <?php echo $viewMode === 'day' ? 'active' : ''; ?>">Day</a>
             <a href="<?= site_url('teacher/schedule?view=week') ?>" class="btn btn-primary <?php echo $viewMode === 'week' ? 'active' : ''; ?>">Week</a>
+            <a href="<?= site_url('teacher/schedule?view=month') ?>" class="btn btn-primary <?php echo $viewMode === 'month' ? 'active' : ''; ?>">Month</a>
         </div>
         <div class="card">
             <div class="card-body">
@@ -18,7 +19,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         var calendarEl = document.getElementById('calendar');
         var calendar = new FullCalendar.Calendar(calendarEl, {
-            initialView: '<?php echo $viewMode === 'day' ? 'timeGridDay' : 'timeGridWeek'; ?>',
+            initialView: '<?php echo $viewMode === 'day' ? 'timeGridDay' : ($viewMode === 'week' ? 'timeGridWeek' : 'dayGridMonth' );?>',
             events: <?php echo $events; ?>,
             eventTimeFormat: {
                 hour: '2-digit',

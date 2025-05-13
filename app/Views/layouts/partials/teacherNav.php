@@ -30,7 +30,7 @@ $profilePicture = $user['profile_picture'] ?? base_url('assets/img/default_avata
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link <?php echo $currentSegment === 'leave-requests' ? 'active' : ''; ?>" href="<?= site_url('teacher/leave-requests') ?>">
+                    <a class="nav-link <?php echo $currentSegment === 'leave_requests' ? 'active' : ''; ?>" href="<?= site_url('teacher/leave_requests') ?>">
                         Leave Requests
                     </a>
                 </li>

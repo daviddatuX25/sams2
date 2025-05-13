@@ -104,6 +104,44 @@ class AttendanceModel extends Model
         return $this->update($attendanceId, $attendanceData);
     }
 
+    public function markAttendance($sessionId, $studentId, $status, $forceUpdate = false)
+    {
+        $data = [
+            'user_id' => $studentId,
+            'class_session_id' => $sessionId,
+            'status' => $status,
+            'marked_at' => date('Y-m-d H:i:s')
+        ];
+
+        // Check if record exists
+        $exists = $this->where('user_id', $studentId)
+                    ->where('class_session_id', $sessionId)
+                    ->first();
+
+        if ($exists && $forceUpdate) {
+            // Update existing record using updateAttendance
+            try {
+                $result = $this->updateAttendance($exists['attendance_id'], $data);
+                return $result ? $exists['attendance_id'] : false;
+            } catch (\Exception $e) {
+                return false;
+            }
+        }
+
+        if (!$exists) {
+            // Insert new record using createAttendance
+            try {
+                $result = $this->createAttendance($data);
+                return $result ? $result->attendance_id : false;
+            } catch (\Exception $e) {
+                return false;
+            }
+        }
+
+        // Return existing record ID without updating if forceUpdate is false
+        return $exists->id;
+    }
+
     public function getAttendanceBySession($sessionId)
     {
         return $this->where('class_session_id', $sessionId)->findAll();

@@ -61,6 +61,13 @@ class AttendanceLogsModel extends Model
         return $this->select('log_id, user_id, class_session_id, tracker_id, action, timestamp')->find($logId);
     }
 
+    public function logAttendance($data) 
+    {
+        if (!$this->validate($data)) throw new \Exception(implode(', ', $this->errors()));
+        $this->insert($data);
+        return $this->getInsertID();
+    }
+
     public function updateLog($logId, $logData)
     {
         $logData['log_id'] = $logId;

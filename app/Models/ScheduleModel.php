@@ -52,6 +52,17 @@ class ScheduleModel extends Model
         return $this->find($scheduleId);
     }
 
+    public function getScheduleByTeacher($teacherId, $withDeleted = false) 
+    {
+        $builder = $this->select('schedule.* , class.class_name, rooms.room_name')
+                        ->join('teacher_assignment', 'teacher_assignment.class_id = schedule.class_id')
+                        ->join('class', 'class.class_id = teacher_assignment.class_id')
+                        ->join('rooms', 'schedule.room_id = rooms.room_id')
+                        ->where('teacher_assignment.teacher_id', $teacherId);
+        if ($withDeleted) $builder->withDeleted();
+        return $builder->findAll();
+    }
+
     public function scheduleExists($scheduleId, $withDeleted = false)
     {
         $builder = $this->builder();

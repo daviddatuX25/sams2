@@ -143,6 +143,24 @@ class UserModel extends Model
         return $builder->get($limit, $offset)->getResultArray();
     }
 
+    public function getRole($userId) 
+    {
+        $user = $this->find($userId);
+        return $user ? $user['role'] : null;
+    }
+
+    public function getUserDetails($userId) 
+    {
+        return $this->select('user_id, user_key, first_name, last_name, middle_name, birthday, gender, bio, profile_picture, role, status')
+                    ->find($userId);
+    }
+
+    public function isRole($userId, $role) 
+    {
+        $user = $this->find($userId);
+        return $user && $user['role'] === $role;
+    }
+
     public function userExists($userKey, $withDeleted = false)
     {
         $builder = $this->builder();

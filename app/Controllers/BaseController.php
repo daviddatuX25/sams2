@@ -98,5 +98,4 @@ abstract class BaseController extends Controller
             'role' => $user['role']
         ];
     }
-
 }

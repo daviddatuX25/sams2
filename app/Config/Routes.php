@@ -29,8 +29,8 @@ $routes->group('student', ['filter' => 'student'], function($routes) {
 $routes->group('teacher', ['filter' => 'teacher'], function ($routes) {
     $routes->get('/', 'TeacherController::index');
     $routes->get('classes', 'TeacherController::classes');
-    $routes->get('classes/(:num)', 'TeacherController::classDetail/$1');
-    $routes->match(['GET', 'POST'], 'leave-requests', 'TeacherController::leaveRequests');
+    $routes->match(['GET', 'POST'], 'classes/(:num)', 'TeacherController::classDetail/$1');
+    $routes->match(['GET', 'POST'], 'leave_requests', 'TeacherController::leaveRequests');
     $routes->get('schedule', 'TeacherController::schedule');
     $routes->get('reports', 'TeacherController::reports');
     $routes->match(['GET', 'POST'], 'profile', 'TeacherController::profile');

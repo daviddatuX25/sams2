@@ -71,6 +71,13 @@ class TrackerModel extends Model
         return $this->where('status', 'active')->findAll();
     }
 
+    public function getTrackersByType($type, $withDeleted = false) 
+    {
+        $builder = $this->where('tracker_type', $type);
+        if ($withDeleted) $builder->withDeleted();
+        return $builder->findAll();
+    }
+
     public function softDelete($trackerId)
     {
         try {

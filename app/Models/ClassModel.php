@@ -110,12 +110,29 @@ class ClassModel extends Model
         return $this->where('teacher_id', $teacherId)->findAll();
     }
 
+    public function getClassesByStudent($studentId, $withDeleted = false) 
+    {
+        $builder = $this->join('student_assignment', 'student_assignment.class_id = class.class_id')
+                        ->where('student_assignment.student_id', $studentId);
+        if ($withDeleted) $builder->withDeleted();
+        return $builder->findAll();
+    }
+
     public function getClassesBySection($section, $withDeleted = false)
     {
         if ($withDeleted) {
             return $this->withDeleted()->where('section', $section)->findAll();
         }
         return $this->where('section', $section)->findAll();
+    }
+
+    public function getClassDetails($classId, $withDeleted = false) {
+        $builder = $this->select('class.*, subject.subject_name, users.first_name, users.last_name')
+                        ->join('subject', 'subject.subject_id = class.subject_id')
+                        ->join('users', 'users.user_id = class.teacher_id')
+                        ->where('class.class_id', $classId);
+        if ($withDeleted) $builder->withDeleted();
+        return $builder->first();
     }
 
     public function getClassSettings($classId)

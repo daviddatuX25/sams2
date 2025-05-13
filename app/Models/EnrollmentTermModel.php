@@ -84,6 +84,13 @@ class EnrollmentTermModel extends Model
                     ->first();
     }
 
+    public function getTermsByYear($year, $withDeleted = false) 
+    {
+        $builder = $this->where('academic_year', $year);
+        if ($withDeleted) $builder->withDeleted();
+        return $builder->findAll();
+    }
+
     public function softDelete($termId)
     {
         try {

@@ -65,6 +65,13 @@ class SubjectModel extends Model
                        ->get()->getResultArray();
     }
 
+    public function getSubjectsByCredits($credits, $withDeleted = false) 
+    {
+        $builder = $this->where('subject_credits', $credits);
+        if ($withDeleted) $builder->withDeleted();
+        return $builder->findAll();
+    }
+
     public function softDelete($subjectId)
     {
         try {

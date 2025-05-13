@@ -62,13 +62,13 @@ class ClassSessionModel extends Model
             'in_list' => 'The auto mark attendance must be one of: yes, no.'
         ],
         'time_in_threshold' => [
-            'required' => 'The time-in threshold is required.'
+            'permit_empty' => 'The time-in threshold is dependent to automatic settings.'
         ],
         'time_out_threshold' => [
-            'required' => 'The time-out threshold is required.'
+            'permit_empty' => 'The time-out threshold is dependent to automatic settings.'
         ],
         'late_threshold' => [
-            'required' => 'The late threshold is required.'
+            'permit_empty' => 'The late threshold is dependent to automatic settings.'
         ]
     ];
 
@@ -99,18 +99,10 @@ class ClassSessionModel extends Model
         return $this->select('class_session_id, class_session_name, class_id, open_datetime, close_datetime')->find($sessionId);
     }
 
-    public function updateSession($sessionId, $sessionData)
-    {
-        $sessionData['class_session_id'] = $sessionId;
-        if (!$this->validate($sessionData)) {
-            throw new \Exception(implode(', ', $this->errors()));
-        }
-        unset($sessionData['class_session_id']);
-        return $this->update($sessionId, $sessionData);
-    }
-
     public function getSessionsByClass($classId, $withDeleted = false)
     {
+        log_message('debug', ' class: ' . $classId);
+        
         if ($withDeleted) {
             return $this->withDeleted()->where('class_id', $classId)->findAll();
         }
@@ -159,6 +151,96 @@ class ClassSessionModel extends Model
         return $this->whereIn('class_id', $classIds)
             ->where('DATE(open_datetime)', date('Y-m-d'))
             ->findAll();
+    }
+
+    public function getSessionsByDate($date, $withDeleted = false) 
+    {
+        $builder = $this->where('DATE(open_datetime)', $date);
+        if ($withDeleted) $builder->withDeleted();
+        return $builder->findAll();
+        log_message('debug', "data: " . print_r($date, true));
+
+    }
+
+    public function startSession($classId, $data)
+    {
+        if (!isset($data['class_session_name']) || !isset($data['open_datetime']) || !isset($data['duration'])) {
+            throw new \Exception('Missing required fields: class_session_name, open_datetime, and duration.');
+        }
+        if (strtotime($data['open_datetime']) <= time()) {
+            throw new \Exception('Start date and time must be in the future.');
+        }
+
+        if (!is_numeric($data['duration']) || $data['duration'] <= 0) {
+            throw new \Exception('Duration must be a positive number.');
+        }
+
+        $data['class_id'] = (int)$classId;
+        // Parse and format open_datetime
+        $openDateTime = str_replace('T', ' ', $data['open_datetime']) . ':00'; // Convert 2025-05-30T02:32 to 2025-05-30 02:32:00
+        $openTimestamp = strtotime($openDateTime);
+        if (!$openTimestamp) {
+            throw new \Exception('Invalid open_datetime format.');
+        }
+        $data['open_datetime'] = date('Y-m-d H:i:s', $openTimestamp);
+        // Validate and calculate close_datetime
+        $duration = (int)$data['duration'];
+        if (!is_numeric($duration) || $duration <= 0) {
+            throw new \Exception('Duration must be a positive number.');
+        }
+        $data['close_datetime'] = date('Y-m-d H:i:s', $openTimestamp + $duration * 60);
+        // Ensure all required fields are set, using defaults if not provided
+        $data['status'] = $data['status'] ?? 'pending';
+        $data['attendance_method'] = $data['attendance_method'] ?? 'manual';
+        $data['auto_mark_attendance'] = $data['auto_mark_attendance'] ?? 'yes';
+        $data['time_in_threshold'] = $data['time_in_threshold'] ?? '00:00:15';
+        $data['time_out_threshold'] = $data['time_out_threshold'] ?? '00:00:15';
+        $data['late_threshold'] = $data['late_threshold'] ?? '00:00:30';
+        if (!$this->validate($data)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        log_message('debug','Hi' . json_encode($data));
+
+        $this->insert($data);
+        return $this->getInsertID();
+    }
+
+    public function updateSession($sessionId, $data)
+    {
+        if (!$this->find($sessionId)) {
+            throw new \Exception('Session not found.');
+        }
+        if (!isset($data['class_session_name']) || !isset($data['open_datetime']) || !isset($data['duration'])) {
+            throw new \Exception('Missing required fields: class_session_name, open_datetime, and duration.');
+        }
+        if (strtotime($data['open_datetime']) <= time()) {
+            throw new \Exception('Start date and time must be in the future.');
+        }
+        if (!is_numeric($data['duration']) || $data['duration'] <= 0) {
+            throw new \Exception('Duration must be a positive number.');
+        }
+
+        $data['open_datetime'] = date('Y-m-d H:i:s', strtotime($data['open_datetime']));
+        $data['close_datetime'] = date('Y-m-d H:i:s', strtotime($data['open_datetime']) + $data['duration'] * 60);
+        
+        // Ensure all required fields are set
+        $data['attendance_method'] = $data['attendance_method'] ?? 'manual';
+        $data['auto_mark_attendance'] = $data['auto_mark_attendance'] ?? 'yes';
+        $data['time_in_threshold'] = $data['time_in_threshold'] ?? '08:00:00';
+        $data['time_out_threshold'] = $data['time_out_threshold'] ?? '09:00:00';
+        $data['late_threshold'] = $data['late_threshold'] ?? '08:15:00';
+
+        $data['class_session_id'] = $sessionId;
+        if (!$this->validate($data)) {
+            throw new \Exception(implode(', ', $this->errors()));
+        }
+        unset($data['class_session_id']);
+
+        return $this->update($sessionId, $data);
+    }
+
+    public function deleteSession($sessionId) {
+        return $this->delete($sessionId);
     }
 
     public function softDelete($sessionId)

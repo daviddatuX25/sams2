@@ -95,6 +95,13 @@ class StudentAssignmentModel extends Model
         return $this->where('class_id', $classId)->findAll();
     }
 
+    public function getAssignmentsByStudent($studentId, $withDeleted = false) 
+    {
+        $builder = $this->where('student_id', $studentId);
+        if ($withDeleted) $builder->withDeleted();
+        return $builder->findAll();
+    }
+
     public function isStudentEnrolled($studentId, $classId, $withDeleted = false)
     {
         $builder = $this->builder();

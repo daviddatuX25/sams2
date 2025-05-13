@@ -20,10 +20,6 @@ INSERT INTO `subject` (`subject_code`, `subject_name`, `subject_description`, `s
 INSERT INTO `enrollment_term` (`academic_year`, `semester`, `sem_start`, `sem_end`, `term_start`, `term_end`, `term_description`, `status`, `deleted_at`) VALUES
 ('2024-2025', '1st', '2024-08-01', '2024-12-15', '2024-08-01', '2024-12-15', 'First semester of 2024', 'active', NULL);
 
--- 6. Insert into `class_session_settings`
-INSERT INTO `class_session_settings` (`attendance_method`, `time_in_threshold`, `time_out_threshold`, `late_threshold`, `auto_create_session`, `auto_mark_attendance`, `deleted_at`) VALUES
-('automatic', '08:00:00', '10:00:00', '08:15:00', 'yes', 'yes', NULL);
-
 -- 7. Insert into `class`
 INSERT INTO `class` (`class_name`, `class_description`, `subject_id`, `teacher_id`, `section`, `class_settings_id`, `deleted_at`) VALUES
 ('CS101-A', 'Programming class section A', 1, 2, 'A', 1, NULL);

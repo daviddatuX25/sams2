@@ -7,7 +7,7 @@
     <div class="col-12 mb-4">
         <div class="card">
             <div class="card-body">
-                <form method="get" class="row g-3">
+                <form method="GET" class="row g-3">
                     <div class="col-md-4">
                         <label for="class_id" class="form-label">Class</label>
                         <select name="class_id" id="class_id" class="form-control">
@@ -66,6 +66,7 @@
         </div>
     </div>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const ctx = document.getElementById('attendanceChart').getContext('2d');

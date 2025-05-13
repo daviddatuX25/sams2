@@ -215,6 +215,11 @@ a:hover {
     color: var(--bs-body-bg);
 }
 
+.badge-danger {
+    background-color: var(--bs-danger);
+    color: var(--bs-body-bg);
+}
+
 /* === PROGRESS === */
 .progress {
     background-color: var(--bs-secondary);
@@ -391,4 +396,16 @@ html[data-bs-theme="dark"] .theme-toggle::after {
     margin-left: 10px;
     color: var(--bs-body-color);
     font-size: 1rem;
+}
+
+/* Custome Styles */
+.form-radio-styled  {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    accent-color: var(--bs-primary) ; /* Bootstrap primary color */
+}
+
+.form-radio-styled:hover {
+    box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.25);
 }

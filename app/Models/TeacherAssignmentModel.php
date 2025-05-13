@@ -95,6 +95,13 @@ class TeacherAssignmentModel extends Model
         return $this->where('teacher_id', $teacherId)->findAll();
     }
 
+    public function getTeachersByClass($classId, $withDeleted = false) 
+    {
+        $builder = $this->where('class_id', $classId);
+        if ($withDeleted) $builder->withDeleted();
+        return $builder->findAll();
+    }
+
     public function isTeacherAssigned($teacherId, $classId, $withDeleted = false)
     {
         $builder = $this->builder();

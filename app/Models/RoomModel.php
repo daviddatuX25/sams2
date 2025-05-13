@@ -81,6 +81,19 @@ class RoomModel extends Model
         return $this->where('room_type', $roomType)->findAll();
     }
 
+    public function getAvailableRooms($weekDay, $timeStart, $timeEnd, $withDeleted = false) 
+    {
+        $scheduleModel = new ScheduleModel();
+        $occupiedRooms = $scheduleModel->where('week_day', $weekDay)
+                                    ->where('time_start <', $timeEnd)
+                                    ->where('time_end >', $timeStart)
+                                    ->findColumn('room_id');
+        $builder = $this->where('room_status', 'active');
+        if ($occupiedRooms) $builder->whereNotIn('room_id', $occupiedRooms);
+        if ($withDeleted) $builder->withDeleted();
+        return $builder->findAll();
+    }
+
     public function softDelete($roomId)
     {
         try {

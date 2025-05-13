@@ -84,19 +84,6 @@ CREATE TABLE `enrollment_term` (
   PRIMARY KEY (`enrollment_term_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Table: class_session_settings
-CREATE TABLE `class_session_settings` (
-  `class_session_settings_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT,
-  `attendance_method` enum('manual','automatic') NOT NULL DEFAULT 'manual',
-  `time_in_threshold` time NOT NULL,
-  `time_out_threshold` time NOT NULL,
-  `late_threshold` time NOT NULL,
-  `auto_create_session` enum('yes','no') NOT NULL DEFAULT 'yes',
-  `auto_mark_attendance` enum('yes','no') NOT NULL DEFAULT 'yes',
-  `deleted_at` DATETIME NULL DEFAULT NULL, -- Soft delete column
-  PRIMARY KEY (`class_session_settings_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
 -- Table: class
 CREATE TABLE `class` (
   `class_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -105,11 +92,9 @@ CREATE TABLE `class` (
   `subject_id` int(10) UNSIGNED NOT NULL,
   `teacher_id` int(10) UNSIGNED NOT NULL,
   `section` varchar(10) NOT NULL,
-  `class_settings_id` int(10) UNSIGNED NOT NULL,
   `deleted_at` DATETIME NULL DEFAULT NULL, -- Soft delete column
   KEY `idx_class_settings` (`class_settings_id`),
   CONSTRAINT `class_ibfk_1` FOREIGN KEY (`teacher_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE,
-  CONSTRAINT `class_ibfk_2` FOREIGN KEY (`class_settings_id`) REFERENCES `class_session_settings` (`class_session_settings_id`) ON DELETE CASCADE,
   CONSTRAINT `class_ibfk_3` FOREIGN KEY (`subject_id`) REFERENCES `subject` (`subject_id`) ON DELETE CASCADE,
   PRIMARY KEY (`class_id`),
   KEY `idx_class_teacher` (`teacher_id`)
@@ -143,9 +128,9 @@ CREATE TABLE `class_sessions` (
   `status` enum('marked','cancelled','pending') NOT NULL DEFAULT 'pending',
   `attendance_method` enum('manual','automatic') NOT NULL DEFAULT 'manual',
   `auto_mark_attendance` enum('yes','no') NOT NULL DEFAULT 'no',
-  `time_in_threshold` time NOT NULL,
-  `time_out_threshold` time NOT NULL,
-  `late_threshold` time NOT NULL,
+  `time_in_threshold` time NULL DEFAULT 00:00:00,
+  `time_out_threshold` time NULL DEFAULT 00:00:00,
+  `late_threshold` time NULL DEFAULT 00:00:00,
   `deleted_at` DATETIME NULL DEFAULT NULL, -- Soft delete column
   PRIMARY KEY (`class_session_id`),
   KEY `class_id` (`class_id`),

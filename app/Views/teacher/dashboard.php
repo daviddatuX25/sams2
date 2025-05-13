@@ -13,10 +13,15 @@
                 <?php else: ?>
                     <ul class="list-group">
                         <?php foreach ($todaySessions as $session): ?>
-                            <li class="list-group-item">
-                                <?php echo esc($session['class_session_name']); ?> 
-                                (<?php echo date('H:i', strtotime($session['open_datetime'])); ?>)
-                                <a href="<?= site_url('teacher/classes/' . $session['class_id']) ?>" class="btn btn-sm btn-primary float-end">View</a>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>
+                                    <?php echo esc($session['class_name'] ?? 'Session ' . $session['class_session_id']); ?> 
+                                    (<?php echo date('H:i', strtotime($session['open_datetime'])); ?>)
+                                    <span class="badge bg-<?php echo $session['status'] === 'open' ? 'success' : 'secondary'; ?>">
+                                        <?php echo ucfirst($session['status']); ?>
+                                    </span>
+                                </span>
+                                <a href="<?= site_url('teacher/classes/' . $session['class_id']) ?>" class="btn btn-sm btn-primary">View</a>
                             </li>
                         <?php endforeach; ?>
                     </ul>
@@ -28,9 +33,9 @@
         <div class="card">
             <div class="card-header">Alerts</div>
             <div class="card-body">
-                <p>Pending Leave Requests: <span class="badge badge-primary"><?php echo esc($pendingLeaveCount); ?></span></p>
-                <p>Unread Notifications: <span class="badge badge-primary"><?php echo esc($unreadCount); ?></span></p>
-                <a href="<?= site_url('teacher/leave-requests') ?>" class="btn btn-primary">View Leave Requests</a>
+                <p>Pending Leave Requests: <span class="badge bg-primary"><?php echo esc($pendingLeaveCount); ?></span></p>
+                <p>Unread Notifications: <span class="badge bg-primary"><?php echo esc($unreadCount); ?></span></p>
+                <a href="<?= site_url('teacher/leave_requests') ?>" class="btn btn-primary">View Leave Requests</a>
             </div>
         </div>
     </div>

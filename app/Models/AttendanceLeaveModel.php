@@ -127,6 +127,13 @@ class AttendanceLeaveModel extends Model
                        ->get()->getResultArray();
     }
 
+    public function getPendingLeaves($withDeleted = false) 
+    {
+        $builder = $this->where('status', 'pending');
+        if ($withDeleted) $builder->withDeleted();
+        return $builder->findAll();
+    }
+
     public function softDelete($leaveId)
     {
         try {
