@@ -17,7 +17,7 @@
             </li>
         </ul>
         <div class="tab-content">
-            <div class="tab-pane fade show active" id="roster">
+            <div class="tab-pane fade show " id="roster">
                 <div class="card">
                     <div class="card-body">
                         <?php if (empty($roster)): ?>
@@ -230,6 +230,7 @@
 </div>
 <script>
 $(document).ready(function() {
+   $('a[href="#<?=esc(session()->getFlashdata('activeNav') ?? 'roster')?>"]').tab('show');
     // Initialize Chart.js
     const ctx = $('#attendanceChart')[0].getContext('2d');
     new Chart(ctx, {
