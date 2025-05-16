@@ -1,8 +1,22 @@
+```php
 <?php $this->extend('layouts/main'); ?>
 <?php $this->section('content'); ?>
 <div class="container mt-4">
     <h1><?= esc($class['class_name']) ?> - <?= esc($class['subject_name']) ?></h1>
-    <p>Teacher: <?= esc($class['first_name'] . ' ' . $class['last_name']) ?>, Section: <?= esc($class['section']) ?></p>
+    <p>Teacher: <?= esc($class['teacher_first_name'] . ' ' . $class['teacher_last_name']) ?>, Section: <?= esc($class['section']) ?></p>
+    <div id="ajax-message" class="alert d-none"></div>
+    <?php if (session()->getFlashdata('success')): ?>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <?= esc(session()->getFlashdata('success')) ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    <?php endif; ?>
+    <?php if (session()->getFlashdata('error')): ?>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <?= esc(session()->getFlashdata('error')) ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    <?php endif; ?>
 
     <ul class="nav nav-tabs mb-4">
         <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#attendance">Attendance</a></li>
@@ -37,20 +51,21 @@
         </div>
         <div class="tab-pane fade" id="leave-requests">
             <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#newLeaveModal">New Request</button>
-            <div class="row">
+            <div class="row" id="leave-requests-list">
                 <?php foreach ($leaveRequests as $request): ?>
-                    <div class="col-md-4 mb-4">
+                    <div class="col-md-4 mb-4 leave-request-item" data-id="<?= $request['attendance_leave_id'] ?>">
                         <div class="card">
                             <div class="card-body">
-                                <p>Reason: <?= esc($request['letter']) ?></p>
-                                <p>Created: <?= esc($request['datetimestamp_created']) ?></p>
+                                <p>Reason: <?= esc($request['reason']) ?></p>
+                                <p>Date: <?= esc($request['leave_date']) ?></p>
+                                <p>Created: <?= esc($request['created_at']) ?></p>
                                 <span class="badge bg-<?= $request['status'] === 'pending' ? 'warning' : ($request['status'] === 'approved' ? 'success' : 'danger') ?>">
                                     <?= ucfirst($request['status']) ?>
                                 </span>
                                 <?php if ($request['status'] === 'pending'): ?>
-                                    <form action="<?= site_url('student/leave_requests') ?>" method="post" class="d-inline">
-                                        <input type="hidden" name="action" value="cancel">
-                                        <input type="hidden" name="leave_id" value="<?= $request['attendance_leave_id'] ?>">
+                                    <form class="cancel-leave-form d-inline" action="<?= site_url('student/classes/' . $class['class_id']) ?>" method="POST">
+                                        <input type="hidden" name="action" value="cancel_leave_request">
+                                        <input type="hidden" name="attendance_leave_id" value="<?= $request['attendance_leave_id'] ?>">
                                         <button type="submit" class="btn btn-danger btn-sm">Cancel</button>
                                     </form>
                                 <?php endif; ?>
@@ -70,11 +85,11 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($attendance as $record): ?>
+                    <?php foreach ($attendanceHistory as $session): ?>
                         <tr>
-                            <td><?= date('Y-m-d', strtotime($record['class_session_id'])) ?></td>
+                            <td><?= date('Y-m-d', strtotime($session['marked_at'])) ?></td>
                             <td>Session</td>
-                            <td><?= ucfirst($record['status']) ?></td>
+                            <td><?= ucfirst($session['status']) ?></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -90,16 +105,19 @@
                     <h5 class="modal-title" id="newLeaveModalLabel">New Leave Request</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form action="<?= site_url('student/leave_requests') ?>" method="post">
+                <form id="leave-request-form" action="<?= site_url('student/classes/'. $class['class_id']) ?>" method="POST">
                     <div class="modal-body">
-                        <input type="hidden" name="action" value="create">
+                        <input type="hidden" name="action" value="submit_leave_request">
+                        <input type="hidden" name="class_id" value="<?= $class['class_id'] ?>">
                         <div class="mb-3">
-                            <label for="letter" class="form-label">Reason for Leave</label>
-                            <textarea class="form-control" id="letter" name="letter" required></textarea>
+                            <label for="reason" class="form-label">Reason for Leave</label>
+                            <textarea class="form-control" id="reason" name="reason" required></textarea>
+                            <div class="invalid-feedback" id="reason_error"></div>
                         </div>
                         <div class="mb-3">
-                            <label for="datetimestamp_created" class="form-label">Date</label>
-                            <input type="date" class="form-control" id="datetimestamp_created" name="datetimestamp_created" required>
+                            <label for="leave_date" class="form-label">Date</label>
+                            <input type="date" class="form-control" id="leave_date" name="leave_date" required>
+                            <div class="invalid-feedback" id="leave_date_error"></div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -111,21 +129,135 @@
         </div>
     </div>
 </div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+$(document).ready(function() {
+    function showMessage(response, form) {
+        $('#ajax-message').removeClass('d-none alert-success alert-danger');
+        if (response.success) {
+            $('#ajax-message').addClass('alert-success').text(response.message);
+            form[0].reset();
+            location.reload();
+        } else {
+            $('#ajax-message').addClass('alert-danger').text(response.message);
+            if (response.errors) {
+                $.each(response.errors, function(field, error) {
+                    $(`#${field}_error`).text(error).addClass('invalid-feedback');
+                    $(`#${field}`).addClass('is-invalid');
+                });
+            }
+        }
+        setTimeout(() => $('#ajax-message').addClass('d-none'), 5000);
+        return response.success;
+    }
+
+    function refreshLeaveRequests() {
+        $.ajax({
+            url: '<?= site_url('student/classes/' . $class['class_id']) ?>',
+            method: 'GET',
+            dataType: 'html',
+            success: function(html) {
+                const newContent = $(html).find('#leave-requests-list').html();
+                $('#leave-requests-list').html(newContent);
+                bindCancelForms();
+            }
+        });
+    }
+
+    function bindCancelForms() {
+        $('.cancel-leave-form').off('submit').on('submit', function(e) {
+        e.preventDefault();
+        const form = $(this); // ✅ Store reference to the form
+        console.log(form.serialize());
+        $('.is-invalid').removeClass('is-invalid');
+        $('.invalid-feedback').text('');
+        $.ajax({
+            url: form.attr('action'),
+            method: 'POST',
+            data: form.serialize(),
+            dataType: 'json',
+            success: function(response) {
+                if (showMessage(response, form)) { // ✅ Use stored reference
+                    refreshLeaveRequests();
+                }
+            },
+            error: function() {
+                $('#ajax-message').removeClass('d-none').addClass('alert-danger').text('An error occurred.');
+                setTimeout(() => $('#ajax-message').addClass('d-none'), 5000);
+            }
+        });
+    });
+
+    }
+
+    // Leave Request Form
+    $('#leave-request-form').on('submit', function(e) {
+        e.preventDefault();
+        $('.is-invalid').removeClass('is-invalid');
+        $('.invalid-feedback').text('');
+        $.ajax({
+            url: $(this).attr('action'),
+            method: 'POST',
+            data: $(this).serialize(),
+            dataType: 'json',
+            success: function(response) {
+                if (showMessage(response, $('#leave-request-form'))) {
+                    $('#newLeaveModal').modal('hide');
+                    refreshLeaveRequests();
+                }
+            },
+            error: function() {
+                $('#ajax-message').removeClass('d-none').addClass('alert-danger').text('An error occurred.');
+                setTimeout(() => $('#ajax-message').addClass('d-none'), 5000);
+            }
+        });
+    });
+
+    // Cancel Leave Forms
+    bindCancelForms();
+
+    // Attendance Chart
     const ctx = document.getElementById('attendanceChart').getContext('2d');
     new Chart(ctx, {
-        type: 'pie',
+        type: 'bar',
         data: {
-            labels: ['Present', 'Absent', 'Late', 'Unmarked'],
-            datasets: [{
-                data: [<?= $attendanceStats['present'] ?>, <?= $attendanceStats['absent'] ?>, <?= $attendanceStats['late'] ?>, <?= $attendanceStats['unmarked'] ?>],
-                backgroundColor: ['#10B981', '#EF4444', '#F59E0B', '#6B7280']
-            }]
+            labels: <?php echo json_encode($chartData['labels']); ?>,
+            datasets: <?php echo json_encode($chartData['datasets']); ?>
         },
         options: {
-            responsive: true,
-            maintainAspectRatio: false
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Number of Sessions' }
+                },
+                x: {
+                    title: { display: true, text: 'Date' }
+                }
+            },
+            plugins: {
+                legend: { display: true },
+                title: { display: true, text: 'Attendance Status by Date' }
+            }
         }
     });
+
+     // Save tab to localStorage when clicked
+    $('a[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
+        const activeTabId = $(e.target).attr('href');
+        localStorage.setItem('activeClassTab', activeTabId);
+    });
+
+    // On page load, activate saved tab
+    const savedTab = localStorage.getItem('activeClassTab');
+    if (savedTab) {
+        const tabTrigger = document.querySelector(`a[href="${savedTab}"]`);
+        if (tabTrigger) {
+            new bootstrap.Tab(tabTrigger).show();
+        }
+    }
+    
+});
 </script>
 <?php $this->endSection(); ?>

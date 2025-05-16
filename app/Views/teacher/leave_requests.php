@@ -23,9 +23,9 @@
                 <div class="card">
                     <div class="card-body">
                         <h5 class="card-title"><?php echo esc($request['first_name'] . ' ' . $request['last_name']); ?></h5>
-                        <p class="card-text">Class: <?php echo esc($request['class_name']); ?></p>
-                        <p class="card-text">Reason: <?php echo esc($request['letter']); ?></p>
-                        <p class="card-text">Date: <?php echo date('Y-m-d', strtotime($request['datetimestamp_created'])); ?></p>
+                        <p class="card-text">Class: <?php echo esc($request['class_name']); ?   ></p>
+                        <p class="card-text">Reason: <?php echo esc($request['reason']); ?></p>
+                        <p class="card-text">Date: <?php echo date('Y-m-d', strtotime($request['leave_date'])); ?></p>
                         <p class="card-text">Status: 
                             <span class="badge bg-<?php echo $request['status'] === 'pending' ? 'primary' : ($request['status'] === 'approved' ? 'success' : 'danger'); ?>">
                                 <?php echo ucfirst($request['status']); ?>

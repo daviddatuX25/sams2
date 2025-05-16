@@ -1,7 +1,7 @@
 <?php
 // Check for flashdata messages
-$success = session()->getFlashdata('success_notification');
-$error = session()->getFlashdata('error_notification');
+$success = session()->getFlashdata('success');
+$error = session()->getFlashdata('error');
 $info = session()->getFlashdata('info_notification');
 ?>
 

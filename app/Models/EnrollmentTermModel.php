@@ -65,4 +65,29 @@ class EnrollmentTermModel extends Model
     {
         return $this->where('status', 'active')->first();
     }
+
+    public function setActiveTerm($termId): void
+    {
+        $term = $this->find($termId);
+        if($term){
+            $this->set('status', 'inactive')
+                ->update();
+            $term['status'] = 'active';
+            $term->update($termId,$term);
+        }
+    }
+
+    public function getActiveTerm(): array
+    {
+        return $this->where('status', 'active')->first();
+    }
+
+    public function getCurrentTermId(): int
+    {
+        $currentDate = date('Y-m-d');
+        $currentTerm = $this->select('enrollment_term_id')
+                            ->where('term_start <=', $currentDate)
+                            ->where('term_end >=', $currentDate)
+                            ->first();
+    }
 }

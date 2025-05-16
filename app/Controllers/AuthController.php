@@ -2,24 +2,21 @@
 
 namespace App\Controllers;
 
-use App\Services\AuthService;
 use App\Services\UserService;
 use App\Services\NotificationService;
 use App\Models\UserModel;
 use App\Models\NotificationsModel;
+use App\Models\EnrollmentTermModel;
+
 use CodeIgniter\HTTP\RequestInterface;
 use CodeIgniter\HTTP\ResponseInterface;
-
 class AuthController extends BaseController
 {
-    protected $authService;
+    protected $userService;
 
     public function __construct()
     {
-        $this->authService = new AuthService(
-            new UserService(new UserModel()),
-            new NotificationService(new NotificationsModel())
-        );
+        $this->userService = new UserService();
     }
 
     public function index($role = null, $action = null)
@@ -55,7 +52,7 @@ class AuthController extends BaseController
             try {
                 $userKey = $this->request->getPost('user_key');
                 $password = $this->request->getPost('password');
-                $user = $this->authService->login($userKey, $password, $role);
+                $user = $this->userService->login($userKey, $password, $role);
                 session()->setFlashdata('success_notification', 'Welcome, ' . $user['first_name']);
                 return redirect()->to($user['role'] . '/');
             } catch (\Exception $e) {
@@ -73,8 +70,7 @@ class AuthController extends BaseController
             try {
                 $userData = $this->request->getPost();
                 $userData['role'] = $role ?? $userData['role'];
-                $newUser = $this->authService->register($userData);
-
+                $newUser = $this->userService->register($userData);
                 session()->setFlashdata('success', 'Registration successful. Please login.');
                 return redirect()->to('/auth/' . $newUser['role'] . '/login');
             } catch (\Exception $e) {
@@ -82,7 +78,6 @@ class AuthController extends BaseController
                 return redirect()->to($role ? "/auth/{$role}/register" : '/auth');
             }
         }
-
         return view('auth/register', ['role' => $role ?? 'student', 'navbar' => 'home']);
     }
 
@@ -91,7 +86,7 @@ class AuthController extends BaseController
         if ($this->request->getMethod() === 'POST') {
             try {
                 $userKey = $this->request->getPost('user_key');
-                $this->authService->forgotPassword($userKey);
+                $this->userService->forgotPassword($userKey);
                 session()->setFlashdata('success', 'Password reset successful. Contact Administrator to get new password.');
                 return redirect()->to('/auth');
             } catch (\Exception $e) {
@@ -105,7 +100,6 @@ class AuthController extends BaseController
 
     public function logout()
     {
-        $this->authService->logout();
-        return redirect()->to('/');
+        $this->userService->logout();
     }
 }

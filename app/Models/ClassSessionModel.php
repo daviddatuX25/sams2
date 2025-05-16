@@ -35,12 +35,12 @@ class ClassSessionModel extends Model
         'class_id' => 'required|is_natural_no_zero',
         'open_datetime' => 'required|valid_date',
         'close_datetime' => 'required|valid_date',
-        'status' => 'required|in_list[marked,cancelled,pending]',
+        'status' => 'required|in_list[marked,cancelled,active]',
         'attendance_method' => 'required|in_list[manual,automatic]',
         'auto_mark_attendance' => 'required|in_list[yes,no]',
-        'time_in_threshold' => 'required|valid_time',
-        'time_out_threshold' => 'required|valid_time',
-        'late_threshold' => 'required|valid_time'
+        'time_in_threshold' => ['label' => 'Time in Threshold', 'rules' => 'permit_empty|regex_match[/^(?:[01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/]'],
+        'time_out_threshold' => ['label' => 'Time Out Threshold', 'rules' => 'permit_empty|regex_match[/^(?:[01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/]'],
+        'late_threshold' => ['label' => 'Late Threshold', 'rules' => 'permit_empty|regex_match[/^(?:[01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/]']
     ];
 
     protected $validationMessages = [
@@ -62,7 +62,7 @@ class ClassSessionModel extends Model
         ],
         'status' => [
             'required' => 'Status is required.',
-            'in_list' => 'Status must be one of: pending, cancelled, marked.'
+            'in_list' => 'Status must be one of: active, cancelled, marked.'
         ],
         'attendance_method' => [
             'required' => 'Attendance method is required.',

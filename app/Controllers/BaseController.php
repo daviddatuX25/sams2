@@ -54,10 +54,14 @@ abstract class BaseController extends Controller
         // Preload any models, libraries, etc, here.
 
         // E.g.: $this->session = service('session');
+
     }
+
+
 
     public function renderPage($pageTitle, $page)
     {
+        
         echo view('includes/header', ['pageTitle' => $pageTitle]);
 
         if (is_array($page)) {

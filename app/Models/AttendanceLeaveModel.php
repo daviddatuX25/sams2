@@ -15,8 +15,8 @@ class AttendanceLeaveModel extends Model
         'user_id',
         'class_id',
         'status',
-        'letter',
-        'datetimestamp_created',
+        'reason',
+        'leave_date',
         'datetimestamp_reviewed',
         'datetimestamp_resolved',
         'deleted_at'
@@ -29,8 +29,8 @@ class AttendanceLeaveModel extends Model
         'user_id' => 'required|is_natural_no_zero',
         'class_id' => 'required|is_natural_no_zero',
         'status' => 'required|in_list[pending,approved,rejected]',
-        'letter' => 'required',
-        'datetimestamp_created' => 'required|valid_date',
+        'reason' => 'required',
+        'leave_date' => 'required|valid_date',
         'datetimestamp_reviewed' => 'permit_empty|valid_date',
         'datetimestamp_resolved' => 'permit_empty|valid_date'
     ];
@@ -44,10 +44,10 @@ class AttendanceLeaveModel extends Model
             'required' => 'Class ID is required.',
             'integer' => 'Class ID must be an integer.'
         ],
-        'letter' => [
+        'reason' => [
             'required' => 'Leave letter is required.'
         ],
-        'datetimestamp_created' => [
+        'leave_date' => [
             'required' => 'Creation timestamp is required.',
             'valid_date' => 'Creation timestamp must be a valid date.'
         ],

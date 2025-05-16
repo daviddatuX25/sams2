@@ -1,11 +1,37 @@
 <?php $this->extend('layouts/main'); ?>
 <?php $this->section('content'); ?>
+
+<?php
+function minutes_to_time(int $minutes): string
+{
+    if ($minutes < 0) {
+        return '00:00:00';
+    }
+    $hours = floor($minutes / 60);
+    $mins = $minutes % 60;
+    if ($hours > 23) {
+        $hours = 23;
+        $mins = 59;
+    }
+    return sprintf('%02d:%02d:00', $hours, $mins);
+}
+
+function time_to_minutes(?string $time): int
+{
+    if (empty($time)) {
+        return 0;
+    }
+    list($hours, $minutes) = explode(':', $time);
+    return ((int)$hours * 60) + (int)$minutes;
+}
+?>
+
 <div class="row">
     <div class="col-12">
         <h1 class="mb-4"><?php echo esc($class['class_name']); ?> (<?php echo esc($class['section']); ?>)</h1>
     </div>
     <div class="col-12">
-        <ul class="nav nav-tabs mb-4">
+        <ul class="nav nav-tabs mb-4" id="classDetailTabs">
             <li class="nav-item">
                 <a class="nav-link active" data-bs-toggle="tab" href="#roster">Roster</a>
             </li>
@@ -17,10 +43,10 @@
             </li>
         </ul>
         <div class="tab-content">
-            <div class="tab-pane fade show " id="roster">
+            <div class="tab-pane fade show active" id="roster">
                 <div class="card">
                     <div class="card-body">
-                        <?php if (empty($roster)): ?>
+                        <?php if(empty($roster)): ?>
                             <p>No students enrolled.</p>
                         <?php else: ?>
                             <table class="table">
@@ -41,67 +67,51 @@
                     </div>
                 </div>
             </div>
-            <div class="tab-pane fade" id="sessions">
-                <div class="card">
-                    <div class="card-body">
-                        <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#sessionModal">Start New Session</button>
-                        <?php if (empty($sessions)): ?>
-                            <p>No sessions scheduled.</p>
-                        <?php else: ?>
-                            <div class="table-responsive">
-                                <table class="table">
-                                    <thead>
-                                        <tr>
-                                            <th>Session Name</th>
-                                            <th>Date & Time</th>
-                                            <th>Duration</th>
-                                            <th>Time In Window</th>
-                                            <th>Time Out Window</th>
-                                            <th>Late Window</th>
-                                            <th>Status</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php helper('main')?>
-                                        <?php foreach ($sessions as $session): ?>
-                                            <tr>
-                                                <td><?php echo esc($session['class_session_name']); ?></td>
-                                                <td><?php echo date('Y-m-d H:i', strtotime($session['open_datetime'])); ?></td>
-                                                <td><?= esc(formatDuration(gmdate('H:i:s', strtotime($session['close_datetime']) - strtotime($session['open_datetime'])))) ?></td>
-                                                <td><?= esc(formatDuration($session['time_in_threshold'])) ?></td>
-                                                <td><?= esc(formatDuration($session['time_out_threshold'])) ?></td>
-                                                <td><?= esc(formatDuration($session['late_threshold'])) ?></td>
-                                                <td>
-                                                    <span class="badge bg-<?php echo $session['status'] === 'open' ? 'success' : 'secondary'; ?>">
-                                                        <?php echo ucfirst($session['status']); ?>
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#sessionModal"
-                                                            data-session-id="<?php echo $session['class_session_id']; ?>"
-                                                            data-open-datetime="<?php echo $session['open_datetime']; ?>"
-                                                            data-duration="<?php echo (strtotime($session['close_datetime']) - strtotime($session['open_datetime'])) / 60; ?>"
-                                                            data-session-name="<?php echo esc($session['class_session_name']); ?>"
-                                                            data-time-in="<?php echo esc($session['time_in_threshold']); ?>"
-                                                            data-time-out="<?php echo esc($session['time_out_threshold']); ?>"
-                                                            data-late="<?php echo esc($session['late_threshold']); ?>">
-                                                        Edit
-                                                    </button>
-                                                    <form method="POST" class="d-inline">
-                                                        <input type="hidden" name="session_id" value="<?php echo $session['class_session_id']; ?>">
-                                                        <input type="hidden" name="action" value="delete_session">
-                                                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this session?');">Delete</button>
-                                                    </form>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php endif; ?>
-                    </div>
+            <div class="tab-pane fade" id="sessions" role="tabpanel" aria-labelledby="sessions-tab">
+                <h3>Sessions</h3>
+                <div class="mb-4">
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#sessionModal" data-mode="create">New Custom Class Session</button>
                 </div>
+                <?php if (session()->has('success')): ?>
+                    <div class="alert alert-success"><?= session()->getFlashdata('success') ?></div>
+                <?php endif; ?>
+                <?php if (session()->has('error')): ?>
+                    <div class="alert alert-danger"><?= session()->getFlashdata('error') ?></div>
+                <?php endif; ?>
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Name</th>
+                            <th>Attendance Method</th>
+                            <th>Auto Mark</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($sessions as $session): ?>
+                            <tr>
+                                <td><?= date('Y-m-d', strtotime($session['open_datetime'])) ?></td>
+                                <td><?= date('H:i', strtotime($session['open_datetime'])) ?> - <?= date('H:i', strtotime($session['close_datetime'])) ?></td>
+                                <td><?= esc($session['class_session_name']) ?></td>
+                                <td><?= ucfirst($session['attendance_method']) ?></td>
+                                <td><?= $session['auto_mark_attendance'] === 'yes' ? 'Yes' : 'No' ?></td>
+                                <td><?= ucfirst($session['status']) ?></td>
+                                <td>
+                                    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#sessionModal" data-mode="edit" 
+                                        data-session='<?= json_encode($session) ?>'>Edit</button>
+                                    <form action="<?= base_url("/teacher/classes/{$class['class_id']}") ?>" method="post" style="display:inline;">
+                                        <input type="hidden" name="action" value="delete_session">
+                                        <input type="hidden" name="session_id" value="<?= $session['class_session_id'] ?>">
+                                        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
             </div>
             <div class="tab-pane fade" id="attendance">
                 <div class="card">
@@ -112,7 +122,7 @@
                                 <option value="">Select a session</option>
                                 <?php foreach ($sessions as $session): ?>
                                     <option value="<?php echo $session['class_session_id']; ?>" <?php echo ($selected_session_id ?? '') == $session['class_session_id'] ? 'selected' : ''; ?>>
-                                        <?= $session['class_session_name']; ?>
+                                        <?= esc($session['class_session_name']); ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
@@ -148,7 +158,7 @@
                         <?php endif; ?>
                         <div class="row justify-content-center">
                             <div class="col-12 col-md-7 col-lg-5">
-                                <canvas id="attendanceChart" class="mt-4 "></canvas>
+                                <canvas id="attendanceChart" class="mt-4"></canvas>
                             </div>
                         </div>
                     </div>
@@ -157,96 +167,134 @@
         </div>
     </div>
 </div>
+
 <!-- Session Modal -->
 <div class="modal fade" id="sessionModal" tabindex="-1" aria-labelledby="sessionModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="sessionModalLabel">Create/Edit Session</h5>
+                <h5 class="modal-title" id="sessionModalLabel">New Custom Class Session</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form method="POST" id="sessionForm">
+            <form method="POST" id="sessionForm" action="<?= base_url("/teacher/classes/{$class['class_id']}") ?>">
                 <div class="modal-body">
-                    <input type="hidden" name="class_session_id" id="class_session_id">
                     <input type="hidden" name="action" id="form_action" value="start_session">
+                    <input type="hidden" name="class_session_id" id="class_session_id">
+                    <div class="mb-3">
+                        <label for="class_session_name" class="form-label">Session Name</label>
+                        <input type="text" name="class_session_name" id="class_session_name" class="form-control" maxlength="255" required>
+                        <div class="invalid-feedback">Please enter a session name.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="session_description" class="form-label">Description</label>
+                        <textarea name="session_description" id="session_description" class="form-control" maxlength="1000"></textarea>
+                        <div class="invalid-feedback">Description cannot exceed 1000 characters.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="open_datetime" class="form-label">Start Date & Time</label>
+                        <input type="datetime-local" name="open_datetime" id="open_datetime" class="form-control" min="<?= date('Y-m-d\TH:i', strtotime('+1 minute')); ?>" required>
+                        <div class="invalid-feedback">Please select a valid start date and time.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="duration" class="form-label">Duration (minutes)</label>
+                        <input type="number" name="duration" id="duration" class="form-control" min="1" required>
+                        <div class="invalid-feedback">Please enter a duration of at least 1 minute.</div>
+                    </div>
+                    <div class="mb-3 status-field d-none">
+                        <label for="status" class="form-label">Status</label>
+                        <select name="status" id="status" class="form-control">
+                            <option value="active">Active</option>
+                            <option value="marked">Marked</option>
+                            <option value="cancelled">Cancelled</option>
+                        </select>
+                        <div class="invalid-feedback">Please select a status.</div>
+                    </div>
                     <div class="mb-3">
                         <label for="attendance_method" class="form-label">Attendance Method</label>
                         <select name="attendance_method" id="attendance_method" class="form-control" required>
                             <option value="manual">Manual</option>
                             <option value="automatic">Automatic</option>
                         </select>
-                        <div class="invalid-feedback" id="attendance_method_error"></div>
+                        <div class="invalid-feedback">Please select an attendance method.</div>
                     </div>
-                    <div id="custom_fields">
+                    <div class="mb-3">
+                        <label for="auto_mark_attendance" class="form-label">Auto Mark Attendance</label>
+                        <select name="auto_mark_attendance" id="auto_mark_attendance" class="form-control" required>
+                            <option value="no">No</option>
+                            <option value="yes">Yes</option>
+                        </select>
+                        <div class="invalid-feedback">Please select whether to auto mark attendance.</div>
+                    </div>
+                    <div id="threshold_fields" class="d-none">
                         <div class="mb-3">
-                            <label for="class_session_name" class="form-label">Session Name</label>
-                            <input type="text" name="class_session_name" id="class_session_name" class="form-control" required>
-                            <div class="invalid-feedback" id="class_session_name_error"></div>
+                            <label for="time_in_threshold" class="form-label">Time In Threshold (minutes)</label>
+                            <input type="number" name="time_in_threshold" id="time_in_threshold" class="form-control" min="0" step="1">
+                            <div class="invalid-feedback">Please enter a valid time in threshold.</div>
                         </div>
                         <div class="mb-3">
-                            <label for="open_datetime" class="form-label">Start Date & Time</label>
-                            <input type="datetime-local" name="open_datetime" id="open_datetime" class="form-control" min="<?= date('Y-m-d\TH:i', strtotime('+1 minute')); ?>" required>
-                            <div class="invalid-feedback" id="open_datetime_error"></div>
+                            <label for="time_out_threshold" class="form-label">Time Out Threshold (minutes)</label>
+                            <input type="number" name="time_out_threshold" id="time_out_threshold" class="form-control" min="0" step="1">
+                            <div class="invalid-feedback">Please enter a valid time out threshold.</div>
                         </div>
                         <div class="mb-3">
-                            <label for="duration" class="form-label">Duration (minutes)</label>
-                            <input type="number" name="duration" id="duration" class="form-control" min="1" required>
-                            <div class="invalid-feedback" id="duration_error"></div>
-                        </div>
-                        <div class="automatic-only" style="display: none;">
-                            <div class="mb-3">
-                                <label for="time_in_threshold" class="form-label">Time In Threshold (minutes)</label>
-                                <input type="number" name="time_in_threshold" id="time_in_threshold" class="form-control" min="0" step="1">
-                                <div class="invalid-feedback" id="time_in_threshold_error"></div>
-                            </div>
-                            <div class="mb-3">
-                                <label for="time_out_threshold" class="form-label">Time Out Threshold (minutes)</label>
-                                <input type="number" name="time_out_threshold" id="time_out_threshold" class="form-control" min="0" step="1">
-                                <div class="invalid-feedback" id="time_out_threshold_error"></div>
-                            </div>
-                            <div class="mb-3">
-                                <label for="late_threshold" class="form-label">Late Threshold (minutes)</label>
-                                <input type="number" name="late_threshold" id="late_threshold" class="form-control" min="0" step="1">
-                                <div class="invalid-feedback" id="late_threshold_error"></div>
-                            </div>
-                            <div class="mb-3">
-                                <label for="auto_mark_attendance" class="form-label">Auto Mark Attendance</label>
-                                <select name="auto_mark_attendance" id="auto_mark_attendance" class="form-control">
-                                    <option value="yes">Yes</option>
-                                    <option value="no">No</option>
-                                </select>
-                                <div class="invalid-feedback" id="auto_mark_attendance_error"></div>
-                            </div>
+                            <label for="late_threshold" class="form-label">Late Threshold (minutes)</label>
+                            <input type="number" name="late_threshold" id="late_threshold" class="form-control" min="0" step="1">
+                            <div class="invalid-feedback">Please enter a valid late threshold.</div>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" class="btn btn-primary">Save</button>
+                    <button type="submit" class="btn btn-primary">Create Session</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+
 <script>
-$(document).ready(function() {
-   $('a[href="#<?=esc(session()->getFlashdata('activeNav') ?? 'roster')?>"]').tab('show');
+document.addEventListener('DOMContentLoaded', function () {
+    // Tab persistence
+    const savedTab = localStorage.getItem('teacherActiveTab');
+    if (savedTab) {
+        const tabTrigger = document.querySelector(`a[data-bs-toggle="tab"][href="${savedTab}"]`);
+        if (tabTrigger) {
+            new bootstrap.Tab(tabTrigger).show();
+        }
+    }
+    document.querySelectorAll('a[data-bs-toggle="tab"]').forEach(tab => {
+        tab.addEventListener('shown.bs.tab', function (e) {
+            localStorage.setItem('teacherActiveTab', e.target.getAttribute('href'));
+        });
+    });
+
+    // Show active tab from flashdata
+    const activeNav = '<?= esc(session()->getFlashdata('activeNav') ?? 'roster') ?>';
+    if (activeNav) {
+        const tabTrigger = document.querySelector(`a[href="#${activeNav}"]`);
+        if (tabTrigger) {
+            new bootstrap.Tab(tabTrigger).show();
+        }
+    }
+
     // Initialize Chart.js
-    const ctx = $('#attendanceChart')[0].getContext('2d');
+    const ctx = document.getElementById('attendanceChart').getContext('2d');
     new Chart(ctx, {
         type: 'pie',
         data: {
-            labels: ['Present', 'Absent', 'Late'],
+            labels: ['Present', 'Absent', 'Late', 'Unmarked'],
             datasets: [{
                 data: [
-                    <?php echo $attendanceStats['present']; ?>,
-                    <?php echo $attendanceStats['absent']; ?>,
-                    <?php echo $attendanceStats['late']; ?>
+                    <?= $attendanceStats['present'] ?? 0 ?>,
+                    <?= $attendanceStats['absent'] ?? 0 ?>,
+                    <?= $attendanceStats['late'] ?? 0 ?>,
+                    <?= $attendanceStats['unmarked'] ?? 0 ?>
                 ],
                 backgroundColor: [
                     'rgba(16, 185, 129, 0.7)',
                     'rgba(239, 68, 68, 0.7)',
-                    'rgba(246, 173, 85, 0.7)'
+                    'rgba(246, 173, 85, 0.7)',
+                    'rgba(198, 193, 188, 0.7)'
                 ]
             }]
         },
@@ -258,157 +306,82 @@ $(document).ready(function() {
         }
     });
 
-    // Toggle automatic fields and required status
-    const toggleAutomaticFields = function() {
-        const $automaticFields = $('.automatic-only');
-        const isAutomatic = $('#attendance_method').val() === 'automatic';
-        $automaticFields.css('display', isAutomatic ? 'block' : 'none');
-        $automaticFields.find('input, select').prop('required', isAutomatic);
-    };
+    // Modal form handling
+    const sessionModal = document.getElementById('sessionModal');
+    const sessionForm = document.getElementById('sessionForm');
+    const autoMarkSelect = document.getElementById('auto_mark_attendance');
+    const thresholdFields = document.getElementById('threshold_fields');
+    const thresholdInputs = thresholdFields.querySelectorAll('input');
+    const statusField = document.querySelector('.status-field');
+    const statusSelect = document.getElementById('status');
 
-    // Modal button click handler
-    $('[data-bs-target="#sessionModal"]').on('click', function() {
-        const sessionId = $(this).data('session-id') || '';
-        const openDatetime = $(this).data('open-datetime') || '';
-        const duration = $(this).data('duration') || '';
-        const sessionName = $(this).data('session-name') || '';
-        const attendanceMethod = $(this).data('attendance-method') || 'manual';
-        const timeIn = $(this).data('time-in') || '0';
-        const timeOut = $(this).data('time-out') || '0';
-        const late = $(this).data('late') || '0';
-        const autoMark = $(this).data('auto-mark') || 'yes';
-        $('#class_session_id').val(sessionId);
-        $('#open_datetime').val(openDatetime ? openDatetime.replace(' ', 'T') : '');
-        $('#duration').val(duration);
-        $('#class_session_name').val(sessionName);
-        $('#attendance_method').val(attendanceMethod);
-        $('#time_in_threshold').val(timeIn);
-        $('#time_out_threshold').val(timeOut);
-        $('#late_threshold').val(late);
-        $('#auto_mark_attendance').val(autoMark);
-        $('#settings_id').val('');
-        $('#sessionModalLabel').text(sessionId ? 'Edit Session' : 'Create Session');
-        $('#form_action').val(sessionId ? 'update_session' : 'start_session');
+    function toggleThresholdFields() {
+        const isAutoMark = autoMarkSelect.value === 'yes';
+        thresholdFields.classList.toggle('d-none', !isAutoMark);
+        thresholdInputs.forEach(input => {
+            input.required = isAutoMark;
+            if (!isAutoMark) {
+                input.value = '';
+            }
+        });
+    }
 
-        toggleAutomaticFields();
-    });
-
-    // Autofill settings
-    $('#settings_id').on('change', function() {
-        const $select = $(this);
-        const $nameInput = $('#class_session_name');
-        const $durationInput = $('#duration');
-        const $attendanceMethodInput = $('#attendance_method');
-        const $timeInInput = $('#time_in_threshold');
-        const $timeOutInput = $('#time_out_threshold');
-        const $lateInput = $('#late_threshold');
-        const $autoMarkInput = $('#auto_mark_attendance');
-
-        if ($select.val()) {
-            const $option = $select.find('option:selected');
-            $nameInput.val($option.data('name') || '');
-            $durationInput.val($option.data('duration') || '');
-            $attendanceMethodInput.val($option.data('attendance-method') || 'manual');
-            $timeInInput.val($option.data('time-in') || '0');
-            $timeOutInput.val($option.data('time-out') || '0');
-            $lateInput.val($option.data('late') || '0');
-            $autoMarkInput.val($option.data('auto-mark') || 'yes');
-        } else {
-            $nameInput.val('');
-            $durationInput.val('');
-            $attendanceMethodInput.val('manual');
-            $timeInInput.val('0');
-            $timeOutInput.val('0');
-            $lateInput.val('0');
-            $autoMarkInput.val('yes');
+    function toggleStatusField(isEditMode) {
+        statusField.classList.toggle('d-none', !isEditMode);
+        statusSelect.required = isEditMode;
+        if (!isEditMode) {
+            statusSelect.value = '';
         }
-        toggleAutomaticFields();
-    });
+    }
 
-    // Attendance method change handler
-    $('#attendance_method').on('change', toggleAutomaticFields);
+    sessionModal.addEventListener('show.bs.modal', function (event) {
+        const button = event.relatedTarget;
+        const mode = button.getAttribute('data-mode');
+        const modalTitle = sessionModal.querySelector('.modal-title');
+        const submitButton = sessionForm.querySelector('button[type="submit"]');
+        const formAction = document.getElementById('form_action');
+        const sessionIdInput = document.getElementById('class_session_id');
 
-    // Client-side validation
-    $('#open_datetime').on('input', function() {
-        const $input = $(this);
-        const $errorDiv = $('#open_datetime_error');
-        const now = new Date();
-        const selectedDate = new Date($input.val());
-        if (selectedDate <= now) {
-            $input.addClass('is-invalid');
-            $errorDiv.text('Start date and time must be in the future.');
-        } else {
-            $input.removeClass('is-invalid');
-            $errorDiv.text('');
+        if (mode === 'create') {
+            modalTitle.textContent = 'New Custom Class Session';
+            submitButton.textContent = 'Create Session';
+            formAction.value = 'start_session';
+            sessionForm.reset();
+            sessionIdInput.value = '';
+            toggleStatusField(false);
+            toggleThresholdFields();
+        } else if (mode === 'edit') {
+            modalTitle.textContent = 'Edit Class Session';
+            submitButton.textContent = 'Update Session';
+            formAction.value = 'update_session';
+            const session = JSON.parse(button.getAttribute('data-session'));
+            sessionIdInput.value = session.class_session_id;
+            document.getElementById('class_session_name').value = session.class_session_name;
+            document.getElementById('session_description').value = session.class_session_description || '';
+            document.getElementById('open_datetime').value = session.open_datetime.replace(' ', 'T').slice(0, 16);
+            const duration = (new Date(session.close_datetime) - new Date(session.open_datetime)) / (1000 * 60);
+            document.getElementById('duration').value = duration;
+            document.getElementById('status').value = session.status;
+            document.getElementById('attendance_method').value = session.attendance_method;
+            document.getElementById('auto_mark_attendance').value = session.auto_mark_attendance;
+            document.getElementById('time_in_threshold').value = session.time_in_threshold ? time_to_minutes(session.time_in_threshold) : '';
+            document.getElementById('time_out_threshold').value = session.time_out_threshold ? time_to_minutes(session.time_out_threshold) : '';
+            document.getElementById('late_threshold').value = session.late_threshold ? time_to_minutes(session.late_threshold) : '';
+            toggleStatusField(true);
+            toggleThresholdFields();
         }
     });
 
-    $('#duration').on('input', function() {
-        const $input = $(this);
-        const $errorDiv = $('#duration_error');
-        if ($input.val() <= 0) {
-            $input.addClass('is-invalid');
-            $errorDiv.text('Duration must be a positive number.');
-        } else {
-            $input.removeClass('is-invalid');
-            $errorDiv.text('');
-        }
-    });
+    autoMarkSelect.addEventListener('change', toggleThresholdFields);
+    autoMarkSelect.addEventListener('input', toggleThresholdFields);
+    toggleThresholdFields();
 
-    $('#class_session_name').on('input', function() {
-        const $input = $(this);
-        const $errorDiv = $('#class_session_name_error');
-        if (!$input.val().trim()) {
-            $input.addClass('is-invalid');
-            $errorDiv.text('Session name is required.');
-        } else if ($input.val().length > 255) {
-            $input.addClass('is-invalid');
-            $errorDiv.text('Session name cannot exceed 255 characters.');
-        } else {
-            $input.removeClass('is-invalid');
-            $errorDiv.text('');
+    sessionForm.addEventListener('submit', function (event) {
+        if (!sessionForm.checkValidity()) {
+            event.preventDefault();
+            event.stopPropagation();
+            sessionForm.classList.add('was-validated');
         }
-    });
-
-    $('#time_in_threshold').on('input', function() {
-        const $input = $(this);
-        const $errorDiv = $('#time_in_threshold_error');
-        if ($input.is(':visible') && $input.val() < 0) {
-            $input.addClass('is-invalid');
-            $errorDiv.text('Time in threshold must be non-negative.');
-        } else {
-            $input.removeClass('is-invalid');
-            $errorDiv.text('');
-        }
-    });
-
-    $('#time_out_threshold').on('input', function() {
-        const $input = $(this);
-        const $errorDiv = $('#time_out_threshold_error');
-        if ($input.is(':visible') && $input.val() < 0) {
-            $input.addClass('is-invalid');
-            $errorDiv.text('Time out threshold must be non-negative.');
-        } else {
-            $input.removeClass('is-invalid');
-            $errorDiv.text('');
-        }
-    });
-
-    $('#late_threshold').on('input', function() {
-        const $input = $(this);
-        const $errorDiv = $('#late_threshold_error');
-        if ($input.is(':visible') && $input.val() < 0) {
-            $input.addClass('is-invalid');
-            $errorDiv.text('Late threshold must be non-negative.');
-        } else {
-            $input.removeClass('is-invalid');
-            $errorDiv.text('');
-        }
-    });
-
-    // Initialize form state on modal show
-    $('#sessionModal').on('shown.bs.modal', function() {
-        toggleAutomaticFields();
     });
 });
 </script>

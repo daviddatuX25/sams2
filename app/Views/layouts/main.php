@@ -26,11 +26,11 @@
         echo $this->include('layouts/components/notification_popup');
         //Navbar
         $navbar = isset($navbar) ? $navbar : 'home';
-        $navbarPath = "layouts/partials/{$navbar}Nav";
+        $navbarPath = "layouts/partials/navbars/{$navbar}Nav";
         if (file_exists(APPPATH . "Views/{$navbarPath}.php")) {
             echo $this->include($navbarPath);
         } else {
-            echo $this->include('layouts/partials/homeNav');
+            echo $this->include('layouts/navbars/partials/homeNav');
         }
     ?>
 

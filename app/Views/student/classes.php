@@ -8,9 +8,8 @@
                 <div class="card">
                     <div class="card-body">
                         <h5 class="card-title"><?= esc($class['class_name']) ?></h5>
-                        <p class="card-text">Teacher: <?= esc($class['first_name'] . ' ' . $class['last_name']) ?></p>
-                        <p class="card-text">Section: <?= esc($class['section']) ?></p>
-                        <a href="<?= site_url('student/classes/' . $class['class_id']) ?>" class="btn btn-primary">View Details</a>
+                        <p class="card-text">Teacher: <?= esc($class['teacher_first_name'] . ' ' . $class['teacher_last_name']) ?></p>
+                        <a href="<?= site_url('student/classes/' . $class['class_id']) ?>" class="btn btn-primary">Explore</a>
                     </div>
                 </div>
             </div>

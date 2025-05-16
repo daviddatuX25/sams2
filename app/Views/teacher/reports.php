@@ -11,7 +11,7 @@
                     <div class="col-md-4">
                         <label for="class_id" class="form-label">Class</label>
                         <select name="class_id" id="class_id" class="form-control">
-                            <option value="">All Classes</option>
+                            <option value="0">All Classes</option>
                             <?php foreach ($classes as $class): ?>
                                 <option value="<?php echo $class['class_id']; ?>" <?php echo $filters['class_id'] == $class['class_id'] ? 'selected' : ''; ?>>
                                     <?php echo esc($class['class_name']); ?>
@@ -38,30 +38,6 @@
         <div class="card">
             <div class="card-body">
                 <canvas id="attendanceChart" height="100"></canvas>
-            </div>
-        </div>
-    </div>
-    <div class="col-12">
-        <div class="card">
-            <div class="card-body">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Class</th>
-                            <th>Status</th>
-                            <th>Count</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($attendanceData as $row): ?>
-                            <tr>
-                                <td><?php echo esc($row['class_name']); ?></td>
-                                <td><?php echo ucfirst($row['status']); ?></td>
-                                <td><?php echo $row['count']; ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
             </div>
         </div>
     </div>
