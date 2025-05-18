@@ -4,13 +4,11 @@ namespace App\Models;
 
 use CodeIgniter\Model;
 
-class NotificationModel extends Model
+class NotificationModel extends BaseModel
 {
     protected $table = 'notifications';
     protected $primaryKey = 'notification_id';
     protected $useAutoIncrement = true;
-    protected $returnType = 'array';
-    protected $useSoftDeletes = true;
     protected $allowedFields = [
         'user_id',
         'message',
@@ -20,10 +18,6 @@ class NotificationModel extends Model
         'updated_at',
         'deleted_at'
     ];
-    protected $useTimestamps = true;
-    protected $createdField = 'created_at';
-    protected $updatedField = 'updated_at';
-    protected $deletedField = 'deleted_at';
     protected $validationRules = [
         'user_id' => 'required|is_natural_no_zero',
         'message' => 'required',

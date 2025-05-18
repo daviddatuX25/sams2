@@ -10,8 +10,9 @@ use App\Models\EnrollmentTermModel;
 
 use CodeIgniter\HTTP\RequestInterface;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Traits\ExceptionHandlingTrait;
 class AuthController extends BaseController
-{
+{   
     protected $userService;
 
     public function __construct()
@@ -34,31 +35,28 @@ class AuthController extends BaseController
             return view('auth/role_action', ['role' => $role, 'navbar' => 'home']);
         }
 
-        switch ($action) {
-            case 'login':
-                return $this->login($role);
-            case 'register':
-                return $this->register($role);
-            default:
-                session()->setFlashdata('error', 'Invalid action');
-                return redirect()->to('/auth');
-        }
-
+        return $this->handleAction(function()
+        use($role, $action){
+             switch ($action) {
+                case 'login':
+                    return $this->login($role);
+                case 'register':
+                    return $this->register($role);
+                default:
+                    return redirect()->to('auth');
+                    throw new BusinessRuleException('Invalid Page');
+            }
+        });
     }
 
     private function login($role = null)
     {
         if ($this->request->getMethod() === 'POST') {
-            try {
-                $userKey = $this->request->getPost('user_key');
-                $password = $this->request->getPost('password');
-                $user = $this->userService->login($userKey, $password, $role);
-                session()->setFlashdata('success_notification', 'Welcome, ' . $user['first_name']);
-                return redirect()->to($user['role'] . '/');
-            } catch (\Exception $e) {
-                session()->setFlashdata('error', $e->getMessage());
-                return redirect()->to($role ? "auth/{$role}/login" : '/auth');
-            }
+            $userKey = $this->request->getPost('user_key');
+            $password = $this->request->getPost('password');
+            $user = $this->userService->login($userKey, $password, $role);
+            session()->setFlashdata('success', 'Welcome, ' . $user['first_name']);
+            return redirect()->to($user['role'] . '/');
         }
 
         return view('auth/login', ['role' => $role, 'navbar' => 'home']);
@@ -67,35 +65,44 @@ class AuthController extends BaseController
     private function register($role = null)
     {
         if ($this->request->getMethod() === 'POST') {
-            try {
-                $userData = $this->request->getPost();
-                $userData['role'] = $role ?? $userData['role'];
-                $newUser = $this->userService->register($userData);
-                session()->setFlashdata('success', 'Registration successful. Please login.');
-                return redirect()->to('/auth/' . $newUser['role'] . '/login');
-            } catch (\Exception $e) {
-                session()->setFlashdata('error', $e->getMessage());
-                return redirect()->to($role ? "/auth/{$role}/register" : '/auth');
-            }
+            $userData = $this->request->getPost();
+            $userData['role'] = $role ?? $userData['role'];
+            $newUser = $this->userService->register($userData);
+            session()->setFlashdata('success', 'Registration successful. Please login.');
+            return redirect()->to('/auth/' . $newUser['role'] . '/login');
         }
         return view('auth/register', ['role' => $role ?? 'student', 'navbar' => 'home']);
     }
 
     public function forgotPassword()
     {
-        if ($this->request->getMethod() === 'POST') {
-            try {
+        return $this->handleAction(function()
+        {
+            if ($this->request->getMethod() === 'POST') {
                 $userKey = $this->request->getPost('user_key');
-                $this->userService->forgotPassword($userKey);
-                session()->setFlashdata('success', 'Password reset successful. Contact Administrator to get new password.');
-                return redirect()->to('/auth');
-            } catch (\Exception $e) {
-                session()->setFlashdata('error', $e->getMessage());
-                return redirect()->to('auth/forgot_password');
-            }
-        }
-
-        return view('auth/forgot_password', ['navbar' => 'home']);
+                $user = $this->userService->resetPassword($userKey);
+                if((new UserModel)->find($this->superadmin)['role'] === 'admin'){
+                    try {
+                        if (!is_numeric($this->superadmin)) {
+                            throw new \Exception('Invalid superadmin user ID');
+                        }
+                        $notification = [
+                            $this->superadmin => [
+                                'message' =>  'Password reset for user ' . $user['user_id'],
+                                'type' => 'info'
+                            ]
+                        ];
+                        (new \App\Services\NotificationService)->magicCreateNotifications($notification);
+                    } catch (\Exception $e) {
+                        log_message('error', 'Failed to create notification: ' . $e->getMessage());
+                        session()->setFlashdata('error', 'Failed to send notification: ' . $e->getMessage());
+                    }
+                }
+                 session()->setFlashdata('success', 'Password reset successfully.');
+             }
+           
+            return view('auth/forgot_password', ['navbar' => 'home']);
+        });
     }
 
     public function logout()

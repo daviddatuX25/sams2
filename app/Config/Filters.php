@@ -35,6 +35,7 @@ class Filters extends BaseFilters
         'pagecache'     => PageCache::class,
         'performance'   => PerformanceMetrics::class,
         // Custom gawa ko ba
+        'auth' => \App\Filters\AuthFilter::class,
         'admin' => \App\Filters\AdminFilter::class,
         'teacher' => \App\Filters\TeacherFilter::class,
         'student' => \App\Filters\StudentFilter::class

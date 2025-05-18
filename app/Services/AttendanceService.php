@@ -10,10 +10,12 @@ use App\Models\ClassSessionModel;
 use App\Models\TrackerModel;
 use App\Models\StudentAssignmentModel;
 use App\Models\TeacherAssignmentModel;
+use App\Traits\ServiceExceptionTrait;
 
 class AttendanceService
 {
-    protected $userRole;
+    use ServiceExceptionTrait;
+
     protected AttendanceModel $attendanceModel;
     protected ?AttendanceLogsModel $attendanceLogsModel;
     protected ?AttendanceLeaveModel $attendanceLeaveModel;
@@ -21,14 +23,12 @@ class AttendanceService
     protected ?TrackerModel $trackerModel;
 
     public function __construct(
-        ?string $userRole = null,
         ?AttendanceModel $attendanceModel = null,
         ?AttendanceLogsModel $attendanceLogsModel = null,
         ?AttendanceLeaveModel $attendanceLeaveModel = null,
         ?ClassSessionModel $classSessionModel = null,
         ?TrackerModel $trackerModel = null
     ) {
-        $this->userRole = $userRole ?? session()->get('role');
         $this->attendanceModel = $attendanceModel ?? new AttendanceModel();
         $this->attendanceLogsModel = $attendanceLogsModel;
         $this->attendanceLeaveModel = $attendanceLeaveModel;
@@ -38,19 +38,10 @@ class AttendanceService
 
     /**
      * Log an attendance action (time_in, time_out, auto) for a user.
-     *
-     * @param int $userId
-     * @param int $classSessionId
-     * @param int $trackerId
-     * @param string $action
-     * @return int
-     * @throws \Exception
      */
     public function logAttendance(int $userId, int $classSessionId, int $trackerId, string $action): int
     {
-        if (!$this->attendanceLogsModel) {
-            $this->attendanceLogsModel = new AttendanceLogsModel();
-        }
+        $this->attendanceLogsModel ??= new AttendanceLogsModel();
 
         $data = [
             'user_id' => $userId,
@@ -64,56 +55,148 @@ class AttendanceService
             return $this->attendanceLogsModel->insertID();
         }
 
-        throw new \Exception('Failed to log attendance');
+        $this->throwBusinessRule('Failed to log attendance');
     }
 
     /**
-     * Retrieve attendance records for a user based on their role.
-     *
-     * @param int $userId
-     * @return array
-     * @throws ValidationException
+     * Retrieve attendance by session ID.
      */
-    public function getAttendanceByUser(int $userId): array
+    public function getAttendanceBySession(int $sessionId): array
     {
-        if (!in_array($this->userRole, ['student', 'teacher', 'admin'])) {
-            throw new ValidationException('Role must be one of: student, teacher, or admin');
+        $sessionModel = new \App\Models\ClassSessionModel();
+        if (!$sessionModel->where('class_session_id', $sessionId)->where('deleted_at IS NULL')->first()) {
+            $this->throwNotFound('Class Session', $sessionId);
         }
 
+        return $this->attendanceModel
+            ->select('attendance_id, session_id, student_id, attendance_status, time_in, time_out, remarks')
+            ->where('session_id', $sessionId)
+            ->where('deleted_at IS NULL')
+            ->findAll();
+    }
+
+    /**
+     * Retrieve attendance by student ID.
+     */
+    public function getAttendanceByStudent(int $studentId): array
+    {
+        $userModel = new \App\Models\UserModel();
+        $student = $userModel->where('user_id', $studentId)->where('role', 'student')->where('deleted_at IS NULL')->first();
+        if (!$student) {
+            $this->throwNotFound('Student', $studentId);
+        }
+
+        return $this->attendanceModel
+            ->select('attendance_id, session_id, student_id, attendance_status, time_in, time_out, remarks')
+            ->where('student_id', $studentId)
+            ->where('deleted_at IS NULL')
+            ->findAll();
+    }
+
+    /**
+     * Bulk update attendance records for a session.
+     */
+    public function bulkUpdateAttendance(int $sessionId, array $attendanceData): bool
+    {
+        $sessionModel = new \App\Models\ClassSessionModel();
+        if (!$sessionModel->where('class_session_id', $sessionId)->where('deleted_at IS NULL')->first()) {
+            $this->throwNotFound('Class Session', $sessionId);
+        }
+
+        $rules = [
+            '*.student_id' => 'required|is_natural_no_zero',
+            '*.attendance_status' => 'required|in_list[present,absent,late,excused]',
+            '*.time_in' => 'permit_empty|valid_time',
+            '*.time_out' => 'permit_empty|valid_time',
+            '*.remarks' => 'permit_empty|max_length[65535]'
+        ];
+
+        if (!\Config\Services::validation()->setRules($rules)->run($attendanceData)) {
+            $this->throwValidationError(implode(', ', \Config\Services::validation()->getErrors()));
+        }
+
+        $userModel = new \App\Models\UserModel();
+        foreach ($attendanceData as $data) {
+            // Ensure student exists
+            $student = $userModel->where('user_id', $data['student_id'])->where('role', 'student')->where('deleted_at IS NULL')->first();
+            if (!$student) {
+                $this->throwNotFound('Student', $data['student_id']);
+            }
+
+            // Find existing attendance record
+            $existing = $this->attendanceModel
+                ->where('session_id', $sessionId)
+                ->where('student_id', $data['student_id'])
+                ->where('deleted_at IS NULL')
+                ->first();
+
+            $data['session_id'] = $sessionId;
+            if ($existing) {
+                // Update existing record
+                $this->attendanceModel->update($existing['attendance_id'], $data);
+            } else {
+                // Create new record
+                $this->attendanceModel->insert($data);
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Retrieve attendance records for a student.
+     */
+    public function student_getAttendanceByUser(int $studentId): array
+    {
+        return $this->attendanceModel
+            ->select('attendance.*')
+            ->join('class_session', 'class_session.class_session_id = attendance.class_session_id')
+            ->join('student_assignment', 'student_assignment.class_id = class_session.class_id')
+            ->where('attendance.user_id', $studentId)
+            ->where('student_assignment.student_id', $studentId)
+            ->where('attendance.deleted_at IS NULL')
+            ->where('class_session.deleted_at IS NULL')
+            ->where('student_assignment.deleted_at IS NULL')
+            ->findAll();
+    }
+
+    /**
+     * Retrieve attendance records for a teacher.
+     */
+    public function teacher_getAttendanceByUser(int $teacherId): array
+    {
+        return $this->attendanceModel
+            ->select('attendance.*')
+            ->join('class_session', 'class_session.class_session_id = attendance.class_session_id')
+            ->join('class', 'class.class_id = class_session.class_id')
+            ->join('teacher_assignment', 'teacher_assignment.class_id = class.class_id')
+            ->where('teacher_assignment.teacher_id', $teacherId)
+            ->where('attendance.deleted_at IS NULL')
+            ->where('class_session.deleted_at IS NULL')
+            ->where('teacher_assignment.deleted_at IS NULL')
+            ->findAll();
+    }
+
+    /**
+     * Retrieve all attendance records for an admin.
+     */
+    public function admin_getAttendanceByUser(?int $userId = null): array
+    {
         $builder = $this->attendanceModel
             ->select('attendance.*')
             ->join('class_session', 'class_session.class_session_id = attendance.class_session_id')
             ->where('attendance.deleted_at IS NULL')
             ->where('class_session.deleted_at IS NULL');
 
-        if ($this->userRole === 'student') {
-            $builder->where('attendance.user_id', $userId)
-                    ->join('student_assignment', 'student_assignment.class_id = class_session.class_id')
-                    ->where('student_assignment.student_id', $userId)
-                    ->where('student_assignment.deleted_at IS NULL');
-        } elseif ($this->userRole === 'teacher') {
-            $builder->join('class', 'class.class_id = class_session.class_id')
-                    ->join('teacher_assignment', 'teacher_assignment.class_id = class.class_id')
-                    ->where('teacher_assignment.teacher_id', $userId)
-                    ->where('teacher_assignment.deleted_at IS NULL');
-        } elseif ($this->userRole === 'admin') {
-            // Admins see all attendance records
-        } else {
-            return [];
+        if ($userId) {
+            $builder->where('attendance.user_id', $userId);
         }
 
         return $builder->findAll();
-       
     }
 
     /**
      * Mark attendance for a user in a class session.
-     *
-     * @param int $userId
-     * @param int $classSessionId
-     * @param string $status
-     * @param bool $isManual
-     * @return bool
      */
     public function markAttendance(int $userId, int $classSessionId, string $status, bool $isManual = false): bool
     {
@@ -129,22 +212,16 @@ class AttendanceService
     }
 
     /**
-     * Calculate attendance rate for a student across all enrolled classes in a term.
-     *
-     * @param int $userId
-     * @param int $termId
-     * @return float
+     * Calculate attendance rate for a student in a term.
      */
-    public function getAttendanceRateByStudent(int $userId, int $termId): float
+    public function student_getAttendanceRate(int $studentId, int $termId): float
     {
-        if (!$this->classSessionModel) {
-            $this->classSessionModel = new ClassSessionModel();
-        }
+        $this->classSessionModel ??= new ClassSessionModel();
 
         $totalSessions = $this->classSessionModel
             ->select('class_session.class_session_id')
             ->join('student_assignment', 'student_assignment.class_id = class_session.class_id')
-            ->where('student_assignment.student_id', $userId)
+            ->where('student_assignment.student_id', $studentId)
             ->where('class_session.status', 'marked')
             ->where('class_session.deleted_at IS NULL')
             ->where('student_assignment.deleted_at IS NULL')
@@ -156,14 +233,14 @@ class AttendanceService
         }
 
         $presentSessions = $this->attendanceModel
-            ->where('user_id', $userId)
+            ->where('user_id', $studentId)
             ->where('status', 'present')
             ->where('class_session_id IN (
                 SELECT class_session_id 
                 FROM class_session 
                 JOIN student_assignment 
                 ON student_assignment.class_id = class_session.class_id 
-                WHERE student_assignment.student_id = ' . $userId . '
+                WHERE student_assignment.student_id = ' . $studentId . '
                 AND class_session.status = "marked"
                 AND class_session.deleted_at IS NULL
                 AND student_assignment.deleted_at IS NULL
@@ -176,43 +253,21 @@ class AttendanceService
     }
 
     /**
-     * Retrieve attendance logs for a user with optional filters.
-     *
-     * @param int $userId
-     * @param array $filters
-     * @return array
-     * @throws \Exception
+     * Retrieve attendance logs for a student.
      */
-    public function getAttendanceLogs(int $userId, array $filters): array
+    public function student_getAttendanceLogs(int $studentId, array $filters): array
     {
-        if (!in_array($this->userRole, ['student', 'teacher', 'admin'])) {
-            throw new ValidationException('Role must be one of: student, teacher, or admin');
-        }
-
         $builder = $this->attendanceModel
             ->select('attendance.*, class.class_name, class_session.class_session_name, attendance.marked_at')
             ->join('class_session', 'class_session.class_session_id = attendance.class_session_id')
             ->join('class', 'class.class_id = class_session.class_id')
+            ->join('student_assignment', 'student_assignment.class_id = class_session.class_id')
+            ->where('attendance.user_id', $studentId)
+            ->where('student_assignment.student_id', $studentId)
             ->where('attendance.deleted_at IS NULL')
             ->where('class_session.deleted_at IS NULL')
-            ->where('class.deleted_at IS NULL');
-
-        // Apply role-based constraints
-        if ($this->userRole === 'student') {
-            $builder->where('attendance.user_id', $userId)
-                    ->join('student_assignment', 'student_assignment.class_id = class_session.class_id')
-                    ->where('student_assignment.student_id', $userId)
-                    ->where('student_assignment.deleted_at IS NULL');
-        } elseif ($this->userRole === 'teacher') {
-            $builder->join('teacher_assignment', 'teacher_assignment.class_id = class.class_id')
-                    ->where('teacher_assignment.teacher_id', $userId)
-                    ->where('teacher_assignment.deleted_at IS NULL');
-        } elseif ($this->userRole === 'admin') {
-            // Admins can view logs for a specific user or all logs
-            if ($userId) {
-                $builder->where('attendance.user_id', $userId);
-            }
-        }
+            ->where('class.deleted_at IS NULL')
+            ->where('student_assignment.deleted_at IS NULL');
 
         // Apply filters
         if (!empty($filters['date'])) {
@@ -228,42 +283,84 @@ class AttendanceService
         return $builder->findAll();
     }
 
-    public function getAttendanceChartData(int $userId, ?string $startDate = null, ?string $endDate = null, ?int $classId = null): array
+    /**
+     * Retrieve attendance logs for a teacher.
+     */
+    public function teacher_getAttendanceLogs(int $teacherId, array $filters): array
     {
-        if (!in_array($this->userRole, ['student', 'teacher', 'admin'])) {
-            throw new ValidationException('Role must be one of: student, teacher, or admin');
+        $builder = $this->attendanceModel
+            ->select('attendance.*, class.class_name, class_session.class_session_name, attendance.marked_at')
+            ->join('class_session', 'class_session.class_session_id = attendance.class_session_id')
+            ->join('class', 'class.class_id = class_session.class_id')
+            ->join('teacher_assignment', 'teacher_assignment.class_id = class.class_id')
+            ->where('teacher_assignment.teacher_id', $teacherId)
+            ->where('attendance.deleted_at IS NULL')
+            ->where('class_session.deleted_at IS NULL')
+            ->where('class.deleted_at IS NULL')
+            ->where('teacher_assignment.deleted_at IS NULL');
+
+        // Apply filters
+        if (!empty($filters['date'])) {
+            $builder->where('DATE(attendance.marked_at)', $filters['date']);
+        }
+        if (!empty($filters['class_id'])) {
+            $builder->where('class.class_id', $filters['class_id']);
+        }
+        if (!empty($filters['status'])) {
+            $builder->where('attendance.status', $filters['status']);
         }
 
-        if (!$this->classSessionModel) {
-            $this->classSessionModel = new ClassSessionModel();
+        return $builder->findAll();
+    }
+
+    /**
+     * Retrieve attendance logs for an admin.
+     */
+    public function admin_getAttendanceLogs(?int $userId, array $filters): array
+    {
+        if($this->isAdmin($userId)){
+            $this->throwUnauthorized();
         }
+
+        $builder = $this->attendanceModel
+            ->select('attendance.*, class.class_name, class_session.class_session_name, attendance.marked_at')
+            ->join('class_session', 'class_session.class_session_id = attendance.class_session_id')
+            ->join('class', 'class.class_id = class_session.class_id')
+            ->where('attendance.deleted_at IS NULL')
+            ->where('class_session.deleted_at IS NULL')
+            ->where('class.deleted_at IS NULL');
+
+        // Apply filters
+        if (!empty($filters['date'])) {
+            $builder->where('DATE(attendance.marked_at)', $filters['date']);
+        }
+        if (!empty($filters['class_id'])) {
+            $builder->where('class.class_id', $filters['class_id']);
+        }
+        if (!empty($filters['status'])) {
+            $builder->where('attendance.status', $filters['status']);
+        }
+
+        return $builder->findAll();
+    }
+
+    /**
+     * Retrieve chart data for a student's attendance.
+     */
+    public function student_getAttendanceChartData(int $studentId, ?string $startDate = null, ?string $endDate = null, ?int $classId = null): array
+    {
+        $this->classSessionModel ??= new ClassSessionModel();
 
         $builder = $this->attendanceModel
             ->select('DATE(class_session.open_datetime) as date, attendance.status, COUNT(*) as count')
             ->join('class_session', 'class_session.class_session_id = attendance.class_session_id')
+            ->join('student_assignment', 'student_assignment.class_id = class_session.class_id')
+            ->where('attendance.user_id', $studentId)
+            ->where('student_assignment.student_id', $studentId)
             ->where('attendance.deleted_at IS NULL')
             ->where('class_session.deleted_at IS NULL')
+            ->where('student_assignment.deleted_at IS NULL')
             ->groupBy(['DATE(class_session.open_datetime)', 'attendance.status']);
-
-        // Apply role-based filters
-        if ($this->userRole === 'student') {
-            $builder->where('attendance.user_id', $userId)
-                    ->join('student_assignment', 'student_assignment.class_id = class_session.class_id')
-                    ->where('student_assignment.student_id', $userId)
-                    ->where('student_assignment.deleted_at IS NULL');
-        } elseif ($this->userRole === 'teacher') {
-            $builder->join('class', 'class.class_id = class_session.class_id')
-                    ->join('teacher_assignment', 'teacher_assignment.class_id = class.class_id')
-                    ->where('teacher_assignment.teacher_id', $userId)
-                    ->where('teacher_assignment.deleted_at IS NULL');
-        } elseif ($this->userRole === 'admin') {
-            // Admins can filter by a specific user if provided, else get all
-            if ($userId) {
-                $builder->where('attendance.user_id', $userId);
-            }
-        } else {
-            return [];
-        }
 
         // Apply optional filters
         if ($startDate) {
@@ -276,9 +373,140 @@ class AttendanceService
             $builder->where('class_session.class_id', $classId);
         }
 
-        $results = $builder->findAll();
+        return $this->buildChartData($builder->findAll());
+    }
 
-        // Initialize chart data structure
+    /**
+     * Retrieve chart data for a teacher's attendance records.
+     */
+    public function teacher_getAttendanceChartData(int $teacherId, ?string $startDate = null, ?string $endDate = null, ?int $classId = null): array
+    {
+        $this->classSessionModel ??= new ClassSessionModel();
+
+        $builder = $this->attendanceModel
+            ->select('DATE(class_session.open_datetime) as date, attendance.status, COUNT(*) as count')
+            ->join('class_session', 'class_session.class_session_id = attendance.class_session_id')
+            ->join('class', 'class.class_id = class_session.class_id')
+            ->join('teacher_assignment', 'teacher_assignment.class_id = class.class_id')
+            ->where('teacher_assignment.teacher_id', $teacherId)
+            ->where('attendance.deleted_at IS NULL')
+            ->where('class_session.deleted_at IS NULL')
+            ->where('teacher_assignment.deleted_at IS NULL')
+            ->groupBy(['DATE(class_session.open_datetime)', 'attendance.status']);
+
+        // Apply optional filters
+        if ($startDate) {
+            $builder->where('class_session.open_datetime >=', $startDate . ' 00:00:00');
+        }
+        if ($endDate) {
+            $builder->where('class_session.open_datetime <=', $endDate . ' 23:59:59');
+        }
+        if ($classId) {
+            $builder->where('class_session.class_id', $classId);
+        }
+
+        return $this->buildChartData($builder->findAll());
+    }
+
+    /**
+     * Retrieve chart data for an admin.
+     */
+    public function admin_getAttendanceChartData(?int $userId = null, ?string $startDate = null, ?string $endDate = null, ?int $classId = null): array
+    {
+        if($this->isAdmin($userId)){
+            $this->throwUnauthorized();
+        }
+
+        $this->classSessionModel ??= new ClassSessionModel();
+
+        $builder = $this->attendanceModel
+            ->select('DATE(class_session.open_datetime) as date, attendance.status, COUNT(*) as count')
+            ->join('class_session', 'class_session.class_session_id = attendance.class_session_id')
+            ->where('attendance.deleted_at IS NULL')
+            ->where('class_session.deleted_at IS NULL')
+            ->groupBy(['DATE(class_session.open_datetime)', 'attendance.status']);
+
+        if ($userId) {
+            $builder->where('attendance.user_id', $userId);
+        }
+        if ($startDate) {
+            $builder->where('class_session.open_datetime >=', $startDate . ' 00:00:00');
+        }
+        if ($endDate) {
+            $builder->where('class_session.open_datetime <=', $endDate . ' 23:59:59');
+        }
+        if ($classId) {
+            $builder->where('class_session.class_id', $classId);
+        }
+
+        return $this->buildChartData($builder->findAll());
+    }
+
+    /**
+     * Retrieve attendance for a session.
+     */
+    public function getAttendanceForSession(int $sessionId): array
+    {
+        return $this->attendanceModel
+            ->select('attendance.*, user.first_name, user.last_name')
+            ->join('user', 'user.user_id = attendance.user_id')
+            ->where('attendance.class_session_id', $sessionId)
+            ->where('attendance.deleted_at IS NULL')
+            ->findAll();
+    }
+
+    /**
+     * Bulk mark attendance for a session by a teacher.
+     */
+   public function teacher_bulkMarkAttendance(int $sessionId, array $attendanceData, int $teacherId): bool 
+    {
+        $this->classSessionModel ??= new ClassSessionModel();
+        $session = $this->classSessionModel->find($sessionId);
+
+        if (!$session) {
+            $this->throwNotFound('Session Id', $sessionId);
+        }
+
+        if (!$this->isTeacherAuthorized($teacherId, $session['class_id'])) {
+            $this->throwUnauthorized('Unauthorized to mark attendance.');
+        }
+
+        foreach ($attendanceData as $userId => $status) {
+            // Check if attendance already exists
+            $existing = $this->attendanceModel
+                ->where('user_id', $userId)
+                ->where('class_session_id', $sessionId)
+                ->first();
+
+            if ($existing) {
+                // Optional: skip or update depending on business rule
+                // Example: Update existing status
+                $this->attendanceModel->update($existing['attendance_id'], [
+                    'status' => $status,
+                    'is_manual' => 1,
+                    'marked_at' => date('Y-m-d H:i:s')
+                ]);
+            } else {
+                // Insert new
+                $this->attendanceModel->save([
+                    'user_id' => $userId,
+                    'class_session_id' => $sessionId,
+                    'status' => $status,
+                    'is_manual' => 1,
+                    'marked_at' => date('Y-m-d H:i:s')
+                ]);
+            }
+        }
+
+        return true;
+    }
+
+
+    /**
+     * Build chart data structure from query results.
+     */
+    private function buildChartData(array $results): array
+    {
         $chartData = [
             'labels' => [], // Dates
             'datasets' => [
@@ -291,7 +519,7 @@ class AttendanceService
 
         // Extract unique dates
         $dates = array_unique(array_column($results, 'date'));
-        sort($dates); // Sort dates chronologically
+        sort($dates);
         $chartData['labels'] = $dates;
 
         // Initialize data arrays
@@ -316,34 +544,9 @@ class AttendanceService
         return $chartData;
     }
 
-    public function getAttendanceForSession(int $sessionId): array
-    {
-        return $this->attendanceModel
-            ->select('attendance.*, user.first_name, user.last_name')
-            ->join('user', 'user.user_id = attendance.user_id')
-            ->where('attendance.class_session_id', $sessionId)
-            ->where('attendance.deleted_at IS NULL')
-            ->findAll();
-    }
-
-    public function bulkMarkAttendance(int $sessionId, array $attendanceData, int $teacherId): bool
-    {
-        $session = $this->classSessionModel->find($sessionId);
-        if (!$session || !$this->isTeacherAuthorized($teacherId, $session['class_id'])) {
-            throw new ValidationException('Unauthorized or invalid session.');
-        }
-        foreach ($attendanceData as $userId => $status) {
-            $this->attendanceModel->save([
-                'user_id' => $userId,
-                'class_session_id' => $sessionId,
-                'status' => $status,
-                'is_manual' => 1,
-                'marked_at' => date('Y-m-d H:i:s')
-            ]);
-        }
-        return true;
-    }
-
+    /**
+     * Check if a teacher is authorized for a class.
+     */
     private function isTeacherAuthorized(int $teacherId, int $classId): bool
     {
         return (new \App\Models\TeacherAssignmentModel())
@@ -351,5 +554,10 @@ class AttendanceService
             ->where('class_id', $classId)
             ->where('deleted_at IS NULL')
             ->countAllResults() > 0;
+    }
+
+    private function isAdmin(int $adminId): bool
+    {
+        return (new \App\Models\UserModel)->find($adminId)['role'] === 'admin';
     }
 }

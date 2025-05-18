@@ -23,7 +23,7 @@
                 <div class="card-header">Profile Photo</div>
                 <div class="card-body text-center">
                     <img src="<?= site_url(session()->get('profile_picture') ?? 'assets/img/profile.png') ?>" alt="Profile Picture" class="rounded-circle mb-3" width="150" height="150" id="profilePreview">
-                    <form id="photo-form" action="<?= site_url(session()->get('role') . '/profile') ?>" method="POST" enctype="multipart/form-data">
+                    <form id="photo-form" action="<?= site_url($urlRedirect) ?>" method="POST" enctype="multipart/form-data">
                         <?= csrf_field() ?>
                         <input type="hidden" name="action" value="update_photo">
                         <div class="mb-3">
@@ -44,7 +44,7 @@
             <div class="card mb-4">
                 <div class="card-header">Profile Details</div>
                 <div class="card-body">
-                    <form id="profile-form" action="<?= site_url(session()->get('role') . '/profile') ?>" method="post">
+                    <form id="profile-form" action="<?= site_url($urlRedirect) ?>" method="post">
                         <?= csrf_field() ?>
                         <input type="hidden" name="action" value="update_profile">
                         <div class="mb-3">
@@ -111,7 +111,7 @@
             <div class="card">
                 <div class="card-header">Change Password</div>
                 <div class="card-body">
-                    <form id="password-form" action="<?= site_url(session()->get('role') . '/change-password') ?>" method="post">
+                    <form id="password-form" action="<?= site_url($urlRedirect) ?>" method="post">
                         <?= csrf_field() ?>
                         <input type="hidden" name="action" value="change_password">
                         <div class="mb-3">

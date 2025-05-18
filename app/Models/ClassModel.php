@@ -4,13 +4,11 @@ namespace App\Models;
 
 use CodeIgniter\Model;
 
-class ClassModel extends Model
+class ClassModel extends BaseModel
 {
     protected $table = 'class';
     protected $primaryKey = 'class_id';
     protected $useAutoIncrement = true;
-    protected $returnType = 'array';
-    protected $useSoftDeletes = true;
     protected $allowedFields = [
         'class_name',
         'class_description',
@@ -18,10 +16,6 @@ class ClassModel extends Model
         'section',
         'deleted_at'
     ];
-    protected $useTimestamps = true;
-    protected $createdField = 'created_at';
-    protected $updatedField = 'updated_at';
-    protected $deletedField = 'deleted_at';
     protected $validationRules = [
         'class_name' => 'required|max_length[255]',
         'class_description' => 'permit_empty',

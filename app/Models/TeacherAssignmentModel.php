@@ -4,13 +4,11 @@ namespace App\Models;
 
 use CodeIgniter\Model;
 
-class TeacherAssignmentModel extends Model
+class TeacherAssignmentModel extends BaseModel
 {
     protected $table = 'teacher_assignment';
     protected $primaryKey = 'assignment_id';
     protected $useAutoIncrement = true;
-    protected $returnType = 'array';
-    protected $useSoftDeletes = true;
     protected $allowedFields = [
         'teacher_id',
         'class_id',
@@ -18,10 +16,6 @@ class TeacherAssignmentModel extends Model
         'assigned_date',
         'deleted_at'
     ];
-    protected $useTimestamps = true;
-    protected $createdField = 'created_at';
-    protected $updatedField = 'updated_at';
-    protected $deletedField = 'deleted_at';
     protected $validationRules = [
         'teacher_id' => 'required|is_natural_no_zero',
         'class_id' => 'required|is_natural_no_zero',

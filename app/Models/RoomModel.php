@@ -4,13 +4,11 @@ namespace App\Models;
 
 use CodeIgniter\Model;
 
-class RoomModel extends Model
+class RoomModel extends BaseModel
 {
     protected $table = 'room';
     protected $primaryKey = 'room_id';
     protected $useAutoIncrement = true;
-    protected $returnType = 'array';
-    protected $useSoftDeletes = true;
     protected $allowedFields = [
         'room_name',
         'room_description',
@@ -20,10 +18,6 @@ class RoomModel extends Model
         'tracker_id',
         'deleted_at'
     ];
-    protected $useTimestamps = true;
-    protected $createdField = 'created_at';
-    protected $updatedField = 'updated_at';
-    protected $deletedField = 'deleted_at';
     protected $validationRules = [
         'room_name' => 'required|is_unique[room.room_name,room_id,{room_id}]|max_length[255]',
         'room_description' => 'permit_empty',

@@ -4,13 +4,11 @@ namespace App\Models;
 
 use CodeIgniter\Model;
 
-class AttendanceLogsModel extends Model
+class AttendanceLogsModel extends BaseModel
 {
     protected $table = 'attendance_logs';
     protected $primaryKey = 'log_id';
     protected $useAutoIncrement = true;
-    protected $returnType = 'array';
-    protected $useSoftDeletes = true;
     protected $allowedFields = [
         'user_id',
         'class_session_id',
@@ -19,10 +17,6 @@ class AttendanceLogsModel extends Model
         'timestamp',
         'deleted_at'
     ];
-    protected $useTimestamps = true;
-    protected $createdField = 'created_at';
-    protected $updatedField = 'updated_at';
-    protected $deletedField = 'deleted_at';
     protected $validationRules = [
         'user_id' => 'required|is_natural_no_zero',
         'class_session_id' => 'required|is_natural_no_zero',

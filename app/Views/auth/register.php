@@ -8,12 +8,6 @@
                     <h3>Register as <?= ucfirst($role) ?></h3>
                 </div>
                 <div class="card-body">
-                    <?php if (session()->has('error')): ?>
-                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                            <?= esc(session('error')) ?>
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>
-                    <?php endif; ?>
                     <form method="POST" action="<?=site_url('auth/' . $role . '/register') ?>">
                         <div class="mb-3">
                             <label for="user_key" class="form-label">User Key</label>

@@ -4,13 +4,11 @@ namespace App\Models;
 
 use CodeIgniter\Model;
 
-class EnrollmentTermModel extends Model
+class EnrollmentTermModel extends BaseModel
 {
     protected $table = 'enrollment_term';
     protected $primaryKey = 'enrollment_term_id';
     protected $useAutoIncrement = true;
-    protected $returnType = 'array';
-    protected $useSoftDeletes = true;
     protected $allowedFields = [
         'academic_year',
         'semester',
@@ -20,10 +18,6 @@ class EnrollmentTermModel extends Model
         'status',
         'deleted_at'
     ];
-    protected $useTimestamps = true;
-    protected $createdField = 'created_at';
-    protected $updatedField = 'updated_at';
-    protected $deletedField = 'deleted_at';
     protected $validationRules = [
         'academic_year' => 'required|max_length[255]',
         'semester' => 'required|in_list[1st,2nd,summer]',

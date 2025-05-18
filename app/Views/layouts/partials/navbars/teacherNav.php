@@ -46,19 +46,21 @@ $profilePicture = $user['profile_picture'] ?? base_url('assets/img/default_avata
                 </li>
             </ul>
             <ul class="navbar-nav ms-auto">
-                <li class="nav-item dropdown">
+                <li class="nav-item dropdown mt-2">
                     <a class="nav-link dropdown-toggle" href="#" id="profileDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                         <img src="<?= site_url(session()->get('profile_picture') ?? 'assets/img/profile.png') ?>" alt="Profile Picture" class="rounded-circle" width="40" height="40">
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="profileDropdown">
-                        <li><a class="dropdown-item" href="<?= site_url('teacher/profile') ?>">View Profile</a></li>
-                        <li><a class="dropdown-item" href="<?= site_url('teacher/logout') ?>">Logout</a></li>
+                        <li><a class="dropdown-item" href="<?= site_url('user/profile') ?>">View Profile</a></li>
+                        <li><a class="dropdown-item" href="<?= site_url('user/logout') ?>">Logout</a></li>
                     </ul>
                 </li>
-                <li class="nav-item d-flex align-items-center ms-2">
+                <li class="nav-item d-flex align-items-center ms-2 ms-sm-0">
                     <button class="theme-toggle" aria-label="Toggle theme"></button>
                     <span class="theme-toggle-label">Theme</span>
                 </li>
+                <!-- Notification Dropdown -->
+                <?= $this->include('layouts/partials/user_notifications') ?>
             </ul>
         </div>
     </div>

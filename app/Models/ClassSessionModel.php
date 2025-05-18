@@ -4,13 +4,11 @@ namespace App\Models;
 
 use CodeIgniter\Model;
 
-class ClassSessionModel extends Model
+class ClassSessionModel extends BaseModel
 {
     protected $table = 'class_session';
     protected $primaryKey = 'class_session_id';
     protected $useAutoIncrement = true;
-    protected $returnType = 'array';
-    protected $useSoftDeletes = true;
     protected $allowedFields = [
         'class_session_name',
         'class_session_description',
@@ -25,17 +23,13 @@ class ClassSessionModel extends Model
         'late_threshold',
         'deleted_at'
     ];
-    protected $useTimestamps = true;
-    protected $createdField = 'created_at';
-    protected $updatedField = 'updated_at';
-    protected $deletedField = 'deleted_at';
     protected $validationRules = [
         'class_session_name' => 'required|max_length[255]',
         'class_session_description' => 'permit_empty',
         'class_id' => 'required|is_natural_no_zero',
         'open_datetime' => 'required|valid_date',
         'close_datetime' => 'required|valid_date',
-        'status' => 'required|in_list[marked,cancelled,active]',
+        'status' => 'required|in_list[pending,marked,cancelled,active,finished]',
         'attendance_method' => 'required|in_list[manual,automatic]',
         'auto_mark_attendance' => 'required|in_list[yes,no]',
         'time_in_threshold' => ['label' => 'Time in Threshold', 'rules' => 'permit_empty|regex_match[/^(?:[01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/]'],
@@ -62,7 +56,7 @@ class ClassSessionModel extends Model
         ],
         'status' => [
             'required' => 'Status is required.',
-            'in_list' => 'Status must be one of: active, cancelled, marked.'
+            'in_list' => 'Status must be one of: pending, active, cancelled, finished, marked.'
         ],
         'attendance_method' => [
             'required' => 'Attendance method is required.',

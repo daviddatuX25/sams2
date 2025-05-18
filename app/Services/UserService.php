@@ -5,21 +5,17 @@ use App\Models\UserModel;
 use App\Models\NotificationModel;
 use CodeIgniter\Validation\Exceptions\ValidationException;
 use CodeIgniter\HTTP\Files\UploadedFile;
+use App\Traits\ServiceExceptionTrait;
 
 class UserService
 {
-    protected $userRole;
+    use ServiceExceptionTrait;
     protected ?UserModel $userModel;
-    protected ?NotificationModel $notificationModel;
 
     public function __construct(
-        ?string $userRole = null,
-        ?UserModel $userModel = null,
-        ?NotificationModel $notificationModel = null
+        ?UserModel $userModel = null
     ) {
-        $this->userRole = $userRole ?? session()->get('role');
-        $this->userModel = $userModel ?? new UserModel();
-        $this->notificationModel = $notificationModel;
+        $this->userModel ??= new UserModel();
     }
 
     public function login(string $userKey, string $password, ?string $role = null): array
@@ -27,7 +23,7 @@ class UserService
         $user = $this->userModel->where('user_key', $userKey)->first();
 
         if (!$user) {
-            throw new \Exception('Invalid credentials');
+            $this->throwValidationError('User not recognized');
         }
 
         $isPasswordValid = false;
@@ -39,15 +35,15 @@ class UserService
         }
 
         if (!$isPasswordValid) {
-            throw new \Exception('Invalid credentials');
+            $this->throwValidationError('Password don\'t match');
         }
 
         if ($role && $user['role'] !== $role) {
-            throw new \Exception('Invalid role');
+            $this->throwUnauthorized('Invalid role login');
         }
 
         if ($user['status'] !== 'active') {
-            throw new \Exception('Account is not active');
+            $this->throwBusinessRule('Account is not active');
         }
 
         if ($user) {
@@ -80,33 +76,49 @@ class UserService
 
     public function getUser(int $userId): ?array
     {
-        if (!in_array($this->userRole, ['student', 'teacher', 'admin'])) {
-            throw new ValidationException('Role must be one of: student, teacher, admin.');
-        }
-
-        if ($this->userRole !== 'admin' && $userId !== (int)session()->get('user_id')) {
-            throw new ValidationException('You can only view your own profile.');
-        }
 
         $user = $this->userModel
             ->select('user_id, user_key, first_name, last_name, middle_name, birthday, gender, bio, profile_picture')
             ->where('user_id', $userId)
             ->where('deleted_at IS NULL')
             ->first();
-
         return $user ?: null;
     }
 
+    /**
+     * Soft delete a user.
+     */
+    public function deleteUser(int $userId): bool
+    {
+        $user = $this->userModel->where('user_id', $userId)->where('deleted_at IS NULL')->first();
+        if (!$user) {
+            $this->throwNotFound('User', $userId);
+        }
+
+        return $this->userModel->delete($userId);
+    }
+
+    /**
+     * Retrieve users by role.
+     */
+    public function getUsersByRole(string $role): array
+    {
+        $validRoles = ['student', 'teacher', 'admin'];
+        if (!in_array($role, $validRoles)) {
+            $this->throwValidationError("Invalid role: {$role}. Must be one of: " . implode(', ', $validRoles));
+        }
+
+        return $this->userModel
+            ->select('user_id, username, email, role, created_at')
+            ->where('role', $role)
+            ->where('deleted_at IS NULL')
+            ->findAll();
+    }
+
+    
+
     public function updateProfile(int $userId, array $userData): bool
     {
-        if (!in_array($this->userRole, ['student', 'teacher', 'admin'])) {
-            throw new ValidationException('Role must be one of: student, teacher, admin.');
-        }
-
-        if ($this->userRole !== 'admin' && $userId !== (int)session()->get('user_id')) {
-            throw new ValidationException('You can only update your own profile.');
-        }
-
         $currentUser = $this->userModel
             ->select('user_id, user_key, first_name, last_name, middle_name, birthday, gender, bio')
             ->where('user_id', $userId)
@@ -150,27 +162,38 @@ class UserService
 
     public function updateProfilePicture(int $userId, string $photoPath): bool
     {
-        if (!in_array($this->userRole, ['student', 'teacher', 'admin'])) {
-            throw new ValidationException('Role must be one of: student, teacher, admin.');
-        }
-
-        if ($this->userRole !== 'admin' && $userId !== (int)session()->get('user_id')) {
-            throw new ValidationException('You can only update your own profile picture.');
-        }
-
         return $this->userModel->update($userId, ['profile_picture' => $photoPath]);
+    }
+
+    public function resetPassword($userKey){
+        $user = $this->userModel
+            ->where('user_key', $userKey)
+            ->where('deleted_at IS NULL')
+            ->first();
+
+        if (!$user) {
+            throw new ValidationException('User not found.');
+        }
+
+        $isTemporary = isset($user['is_password_temporary']) && (int)$user['is_password_temporary'] === 1;
+
+        if($isTemporary){
+            $this->throwBusinessRule('Your password has already been reset or is temporary.');
+        }
+        // Random Password : Alphanumeric
+        $password = substr(bin2hex(random_bytes(4)), 0, 8); // 8 hex characters
+
+        $this->userModel->update($user['user_id'], [
+            'password_hash' => $password,
+            'is_password_temporary' => 1
+        ]);
+        
+        return $user;
+
     }
 
     public function changePassword(int $userId, string $oldPassword, string $newPassword): bool
     {
-        if (!in_array($this->userRole, ['student', 'teacher', 'admin'])) {
-            throw new ValidationException('Role must be one of: student, teacher, admin.');
-        }
-
-        if ($this->userRole !== 'admin' && $userId !== (int)session()->get('user_id')) {
-            throw new ValidationException('You can only change your own password.');
-        }
-
         $user = $this->userModel
             ->where('user_id', $userId)
             ->where('deleted_at IS NULL')
@@ -200,32 +223,6 @@ class UserService
 
     public function handleProfileAction(int $userId, string $action, array $postData, ?UploadedFile $file = null, bool $isAjax = false): array
     {
-        if (!in_array($this->userRole, ['student', 'teacher', 'admin'])) {
-            $response = [
-                'success' => false,
-                'message' => 'Role must be one of: student, teacher, admin.',
-                'errors' => ['role' => 'Invalid role'],
-                'error_code' => 'invalid_role'
-            ];
-            if ($isAjax) {
-                return $response;
-            }
-            throw new ValidationException($response['message']);
-        }
-
-        if ($this->userRole !== 'admin' && $userId !== (int)session()->get('user_id')) {
-            $response = [
-                'success' => false,
-                'message' => 'You can only modify your own profile.',
-                'errors' => ['user_id' => 'Unauthorized access'],
-                'error_code' => 'unauthorized_access'
-            ];
-            if ($isAjax) {
-                return $response;
-            }
-            throw new ValidationException($response['message']);
-        }
-
         $user = $this->userModel->where('user_id', $userId)->where('deleted_at IS NULL')->first();
         if (!$user) {
             $response = [

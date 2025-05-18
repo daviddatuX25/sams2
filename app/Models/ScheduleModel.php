@@ -4,13 +4,11 @@ namespace App\Models;
 
 use CodeIgniter\Model;
 
-class ScheduleModel extends Model
+class ScheduleModel extends BaseModel
 {
     protected $table = 'schedule';
     protected $primaryKey = 'schedule_id';
     protected $useAutoIncrement = true;
-    protected $returnType = 'array';
-    protected $useSoftDeletes = true;
     protected $allowedFields = [
         'room_id',
         'class_id',
@@ -20,10 +18,6 @@ class ScheduleModel extends Model
         'status',
         'deleted_at'
     ];
-    protected $useTimestamps = true;
-    protected $createdField = 'created_at';
-    protected $updatedField = 'updated_at';
-    protected $deletedField = 'deleted_at';
     protected $validationRules = [
         'room_id' => 'required|is_natural_no_zero',
         'class_id' => 'required|is_natural_no_zero',

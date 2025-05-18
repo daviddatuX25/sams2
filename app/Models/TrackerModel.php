@@ -4,13 +4,11 @@ namespace App\Models;
 
 use CodeIgniter\Model;
 
-class TrackerModel extends Model
+class TrackerModel extends BaseModel
 {
     protected $table = 'tracker';
     protected $primaryKey = 'tracker_id';
     protected $useAutoIncrement = true;
-    protected $returnType = 'array';
-    protected $useSoftDeletes = true;
     protected $allowedFields = [
         'tracker_name',
         'tracker_description',
@@ -18,10 +16,6 @@ class TrackerModel extends Model
         'status',
         'deleted_at'
     ];
-    protected $useTimestamps = true;
-    protected $createdField = 'created_at';
-    protected $updatedField = 'updated_at';
-    protected $deletedField = 'deleted_at';
     protected $validationRules = [
         'tracker_name' => 'required|is_unique[tracker.tracker_name,tracker_id,{tracker_id}]|max_length[255]',
         'tracker_description' => 'permit_empty',
