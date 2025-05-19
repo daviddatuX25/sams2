@@ -104,7 +104,7 @@ class TeacherController extends BaseController
 
             $data = [
                 'class' => (new ClassService)->teacher_getClassInfoByUser($userId, $classId),
-                'roster' => (new ClassService)->getClassRosterByUser($classId),
+                'roster' => (new ClassService)->getClassRosterByUser((int)$classId),
                 'sessions' => $this->classSessionService->teacher_getClassSessionsByClass($classId, $userId) ?? [],
                 'attendance' => array_column($attendance, 'status', 'user_id'),
                 'selected_session_id' => $selectedSessionId,

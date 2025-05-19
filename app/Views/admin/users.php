@@ -120,6 +120,10 @@
                             <label for="editLastName" class="form-label">Last Name</label>
                             <input type="text" class="form-control" id="editLastName" name="last_name">
                         </div>
+                         <div class="mb-3">
+                            <label for="editPassword" class="form-label">Temporary password</label>
+                            <input type="text" class="form-control" id="editPassword" name="" disabled>
+                        </div>
                         <div class="mb-3">
                             <label for="editRole" class="form-label">Role</label>
                             <select class="form-control" id="editRole" name="role">
@@ -193,6 +197,14 @@ $(document).ready(function() {
                     $('#editLastName').val(response.data.last_name);
                     $('#editStatus').val(response.data.status);
                     $('#editRole').val(response.data.role);
+                    if (response.data.is_password_temporary == 1) {
+                        $('#editPassword').show();
+                        $('#editPassword').val(response.data.password_hash);
+                    } else {
+                        $('#editPassword').val('');
+                        $('#editPassword').hide();
+                    }
+
                 } else {
                     alert('Error fetching user data: ' + response.message);
                 }

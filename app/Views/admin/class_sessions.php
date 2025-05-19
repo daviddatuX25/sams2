@@ -1,4 +1,4 @@
-<?php $this->extend('layouts/main'); ?>
+<?php $this->extend('layouts/admin'); ?>
 <?php $this->section('content'); ?>
 <div class="container">
     <h1>Class Sessions</h1>
@@ -49,8 +49,8 @@
                     <tr>
                         <th>ID</th>
                         <th>Class</th>
-                        <th>Date</th>
-                        <th>Time</th>
+                        <th>Datetime Start</th>
+                        <th>Datetime End</th>
                         <th>Status</th>
                         <th>Actions</th>
                     </tr>
@@ -59,9 +59,9 @@
                     <?php foreach ($sessions as $session): ?>
                         <tr>
                             <td><?= esc($session['class_session_id']) ?></td>
-                            <td><?= esc($session['class_name']) ?></td>
-                            <td><?= esc($session['date']) ?></td>
-                            <td><?= esc($session['start_time'] . ' - ' . $session['end_time']) ?></td>
+                            <td><?= esc($session['class_session_name']) ?></td>
+                            <td><?= esc($session['open_datetime'])?></td>
+                            <td><?= esc($session['close_datetime'])?>/td>
                             <td><?= esc($session['status']) ?></td>
                             <td>
                                 <button class="btn btn-sm btn-primary edit-btn" data-id="<?= $session['class_session_id'] ?>" data-url="<?= site_url('admin/class-sessions') ?>" data-bs-toggle="modal" data-bs-target="#editSessionModal">Edit</button>
@@ -89,7 +89,7 @@
                             <label for="addClassId" class="form-label">Class</label>
                             <select class="form-control" id="addClassId" name="class_id">
                                 <?php foreach ($classes as $class): ?>
-                                    <option value="<?= $class['class_id'] ?>"><?= esc($class['name']) ?></option>
+                                    <option value="<?= $class['class_id'] ?>"><?= esc($class['class_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -131,7 +131,7 @@
                             <label for="edit-class_id" class="form-label">Class</label>
                             <select class="form-control" id="edit-class_id" name="class_id">
                                 <?php foreach ($classes as $class): ?>
-                                    <option value="<?= $class['class_id'] ?>"><?= esc($class['name']) ?></option>
+                                    <option value="<?= $class['class_id'] ?>"><?= esc($class['class_name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>

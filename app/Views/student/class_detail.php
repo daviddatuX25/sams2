@@ -1,4 +1,21 @@
-```php
+<?php
+$events = [];
+
+foreach ($chartData['labels'] as $i => $date) {
+    foreach ($chartData['datasets'] as $dataset) {
+        $status = $dataset['label']; // 'Present', 'Absent', etc.
+        $count = $dataset['data'][$i]; // Number of sessions
+        if ($count > 0) {
+            $events[] = [
+                'title' => "$status: $count",
+                'start' => $date,
+                'allDay' => true,
+                'color' => $dataset['backgroundColor']
+            ];
+        }
+    }
+}
+?>
 <?php $this->extend('layouts/main'); ?>
 <?php $this->section('content'); ?>
 <div class="container mt-4">
@@ -28,7 +45,7 @@
     <div class="tab-content">
         <div class="tab-pane fade show active" id="attendance">
             <div class="d-flex justify-content-center align-items-center">
-                <canvas id="attendanceChart"></canvas>
+                <div id="calendar" style="width: 80vw"></div>
             </div>
             <a href="<?= site_url('student/attendance') ?>" class="btn btn-primary mt-3">View All History</a>
         </div>
@@ -129,9 +146,15 @@
         </div>
     </div>
 </div>
+<!-- Add this CSS -->
+<style>
+  /* Make the calendar bigger */
+  #calendar {
+    margin: 0 auto;
+    font-size: 1.2rem;   /* bigger font size */
+  }
 
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</style>
 <script>
 $(document).ready(function() {
     function showMessage(response, form) {
@@ -221,27 +244,46 @@ $(document).ready(function() {
     // Attendance Chart
     const ctx = document.getElementById('attendanceChart').getContext('2d');
     new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: <?php echo json_encode($chartData['labels']); ?>,
-            datasets: <?php echo json_encode($chartData['datasets']); ?>
-        },
-        options: {
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: { display: true, text: 'Number of Sessions' }
-                },
-                x: {
-                    title: { display: true, text: 'Date' }
+    type: 'bar',
+    data: {
+        labels: <?php echo json_encode($chartData['labels']); ?>,
+        datasets: <?php echo json_encode($chartData['datasets']); ?>
+    },
+    options: {
+        responsive: true,
+        scales: {
+            x: {
+                stacked: true,
+                title: {
+                    display: true,
+                    text: 'Date'
                 }
             },
-            plugins: {
-                legend: { display: true },
-                title: { display: true, text: 'Attendance Status by Date' }
+            y: {
+                stacked: true,
+                beginAtZero: true,
+                title: {
+                    display: true,
+                    text: 'Number of Sessions'
+                }
+            }
+        },
+        plugins: {
+            legend: {
+                display: true,
+                position: 'top'
+            },
+            title: {
+                display: true,
+                text: 'Attendance Status by Date'
+            },
+            tooltip: {
+                mode: 'index',
+                intersect: false
             }
         }
-    });
+    }
+});
 
      // Save tab to localStorage when clicked
     $('a[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
@@ -260,4 +302,16 @@ $(document).ready(function() {
     
 });
 </script>
+ <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var calendarEl = document.getElementById('calendar');
+
+            var calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                events: <?php echo json_encode($events); ?>
+            });
+
+            calendar.render();
+        });
+    </script>
 <?php $this->endSection(); ?>

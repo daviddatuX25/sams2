@@ -159,17 +159,26 @@ class ClassService
 
     public function getClassRosterByUser(int $classId): ?array
     {
-        if (!$this->classModel->find($classId)){
-             $this->throwNotFound('Class id', $classId );
+        log_message('debug', "Fetching class roster for class ID: {$classId}");
+
+        // Check if the class exists and is not deleted
+        if (!$this->classModel->where('class_id', $classId)->where('deleted_at', null)->first()) {
+            $this->throwNotFound('Class ID', $classId);
         }
 
-        return $this->classModel
-                    ->select('user.*')
-                    ->join('student_assignment', 'student_assignment.class_id = class.class_id')
-                    ->join('user', 'user.user_id = student_assignment.student_id')
-                    ->where('class.class_id', $classId)
-                    ->where('student_assignment.deleted_at IS NULL')
-                    ->where('class.deleted_at IS NULL')
-                    ->findAll();
+        // Fetch students assigned to the class
+        $roster = $this->classModel
+            ->select('user.*')
+            ->join('student_assignment', 'student_assignment.class_id = class.class_id')
+            ->join('user', 'user.user_id = student_assignment.student_id')
+            ->where('class.class_id', $classId)
+            ->where('class.deleted_at IS NULL')
+            ->where('student_assignment.deleted_at IS NULL')
+            ->where('user.role', 'student') // Ensure only students are included
+            ->where('user.deleted_at IS NULL') // Ensure users are not deleted
+            ->findAll();
+
+        // Return null if no students are found
+        return !empty($roster) ? $roster : [];
     }
 }

@@ -78,7 +78,7 @@ class UserService
     {
 
         $user = $this->userModel
-            ->select('user_id, user_key, first_name, last_name, middle_name, birthday, gender, bio, profile_picture, role, status')
+            ->select('user_id, user_key, first_name, last_name, middle_name, birthday, gender, bio, profile_picture, role, status, is_password_temporary, password_hash')
             ->where('user_id', $userId)
             ->where('deleted_at IS NULL')
             ->first();
