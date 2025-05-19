@@ -25,6 +25,17 @@ class EnrollmentTermService
         return $this->enrollmentTermModel->insertID();
     }
 
+
+    /**
+     * Retrieve enrollment terms.
+     */
+    public function getTerm($termId): array
+    {
+        return $this->enrollmentTermModel
+            ->where('deleted_at IS NULL')
+            ->where('enrollment_term_id', $termId);
+    }
+
     /**
      * Retrieve enrollment terms.
      */

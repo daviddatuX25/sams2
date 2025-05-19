@@ -18,6 +18,16 @@ class ClassService
         $this->classModel ??= $classModel ?? new ClassModel();
     }
 
+    public function countActive(): int
+    {
+        return $this->classModel->where('status', 'active')->where('deleted_at IS NULL')->countAllResults();
+    }
+
+    public function getClasses(): array
+    {
+        return $this->classModel->where('deleted_at IS NULL')->findAll();
+    }
+
     public function getClassesBySubject(int $subjectId): array
     {
         $subjectModel = new \App\Models\SubjectModel();

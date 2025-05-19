@@ -357,4 +357,41 @@ class ClassSessionService
             ->where('deleted_at IS NULL')
             ->countAllResults() > 0;
     }
+    public function countPending(): int
+    {
+        return $this->classSessionModel->where('status', 'pending')->where('deleted_at IS NULL')->countAllResults();
+    }
+
+    public function getSessions(): array
+    {
+        return $this->classSessionModel->where('deleted_at IS NULL')->findAll();
+    }
+
+    public function createSession(array $postData): int
+    {
+        return $this->createClassSession($postData); // Alias or adjust signature
+    }
+
+    public function updateSession(int $classSessionId, array $postData): bool
+    {
+        $session = $this->classSessionModel->find($classSessionId);
+        if (!$session) {
+            $this->throwNotFound('Class Session', $classSessionId);
+        }
+        return $this->classSessionModel->update($classSessionId, $postData);
+    }
+
+    public function deleteSession(int $classSessionId): bool
+    {
+        $session = $this->classSessionModel->find($classSessionId);
+        if (!$session) {
+            $this->throwNotFound('Class Session', $classSessionId);
+        }
+        return $this->classSessionModel->delete($classSessionId);
+    }
+
+    public function countOpen(): int
+    {
+        return $this->classSessionModel->where('status', 'active')->where('deleted_at IS NULL')->countAllResults();
+    }
 }

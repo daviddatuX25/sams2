@@ -311,5 +311,32 @@ class NotificationService
 
         return true;
     }
+
+    public function createNotification(array $data): int
+    {
+        $validation = \Config\Services::validation();
+        $rules = [
+            'user_id' => 'required|is_natural_no_zero',
+            'message' => 'required|min_length[5]|max_length[1000]',
+            'type' => 'required|in_list[info,warning,error,success]'
+        ];
+        if (!$validation->setRules($rules)->run($data)) {
+            throw new \CodeIgniter\Validation\Exceptions\ValidationException(implode(', ', $validation->getErrors()));
+        }
+        $insertData = [
+            'user_id' => $data['user_id'],
+            'message' => $data['message'],
+            'type' => $data['type'],
+            'is_read' => 0,
+            'created_at' => date('Y-m-d H:i:s')
+        ];
+        $this->notificationModel->insert($insertData);
+        return $this->notificationModel->insertID();
+    }
+
+    public function updateNotification(int $notificationId, array $data): bool
+    {
+        return $this->notificationModel->update($notificationId, $data);
+    }
     
 }

@@ -23,9 +23,127 @@ body {
 }
 
 .sidebar {
-    flex-shrink: 0;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 250px;
+    height: 100vh;
+    background-color: var(--bs-primary); /* Matches navbar */
+    border-right: 1px solid var(--bs-border-color);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-nav .nav-link {
+    color: var(--bs-body-color);
+    padding: 0.5rem 1rem;
+    border-radius: 0.25rem;
+    background-color: transparent;
+}
+
+.sidebar-nav .nav-link:hover {
     background-color: var(--bs-secondary);
-    min-height: 100%;
+    color: var(--bs-body-color);
+}
+
+.sidebar-nav .nav-link.active {
+    background-color: var(--bs-secondary);
+    color: var(--bs-body-color);
+    font-weight: bold;
+}
+
+.sidebar-header {
+    padding: 1rem;
+    border-bottom: 1px solid var(--bs-border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.sidebar-brand {
+    text-decoration: none;
+    color: var(--bs-body-color);
+}
+
+.sidebar-collapse {
+    flex-grow: 1;
+    overflow-y: auto;
+}
+
+.sidebar-nav {
+    list-style: none;
+    padding: 1rem;
+    margin: 0;
+}
+
+.sidebar-nav .nav-item {
+    margin-bottom: 0.5rem;
+}
+
+.sidebar-nav .nav-link {
+    color: var(--bs-body-color);
+    padding: 0.5rem 1rem;
+    border-radius: 0.25rem;
+}
+
+.sidebar-nav .nav-link:hover {
+    background-color: var(--bs-primary);
+    color: var(--bs-body-bg);
+}
+
+.sidebar-nav .nav-link.active {
+    background-color: var(--bs-primary);
+    color: var(--bs-body-bg);
+    font-weight: bold;
+}
+
+.sidebar-footer {
+    border-top: 1px solid var(--bs-border-color);
+    padding-top: 1rem;
+    margin-top: auto;
+}
+
+.sidebar .rounded-circle {
+    border: 2px solid var(--bs-primary);
+    object-fit: cover;
+}
+
+.sidebar .rounded-circle:hover {
+    border-color: var(--bs-link-hover-color);
+}
+
+.sidebar-toggler {
+    display: none;
+}
+
+@media (max-width: 991px) {
+    .sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+    }
+    .sidebar-toggler {
+        display: block;
+    }
+    .sidebar-collapse {
+        display: none;
+    }
+    .sidebar-collapse.show {
+        display: block;
+    }
+}
+
+.main-content {
+    margin-left: 250px;
+    padding: 1rem;
+    min-height: calc(100vh - 60px); /* Adjust for footer height */
+}
+
+@media (max-width: 991px) {
+    .main-content {
+        margin-left: 0;
+    }
 }
 
 

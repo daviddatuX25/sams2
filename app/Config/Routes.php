@@ -51,6 +51,7 @@ $routes->group('admin', ['filter' => 'admin'], function ($routes) {
     $routes->match(['GET', 'POST'], 'users', 'AdminController::users');
     $routes->match(['GET', 'POST'], 'subjects', 'AdminController::subjects');
     $routes->match(['GET', 'POST'], 'classes', 'AdminController::classes');
+    $routes->match(['GET', 'POST'], 'enrollment-terms/(:num)/(:segment)', 'AdminController::enrollmentTerms/$1/$2');
     $routes->match(['GET', 'POST'], 'enrollment-terms', 'AdminController::enrollmentTerms');
     $routes->match(['GET', 'POST'], 'student-assignments', 'AdminController::studentAssignments');
     $routes->match(['GET', 'POST'], 'teacher-assignments', 'AdminController::teacherAssignments');

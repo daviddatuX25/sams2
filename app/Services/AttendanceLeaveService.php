@@ -252,4 +252,14 @@ class AttendanceLeaveService
             ->where('deleted_at IS NULL')
             ->countAllResults() > 0;
     }
+
+    public function countPending(): int
+    {
+        return $this->attendanceLeaveModel->where('status', 'pending')->where('deleted_at IS NULL')->countAllResults();
+    }
+
+    public function getRecent(int $limit = 5): array
+    {
+        return $this->attendanceLeaveModel->where('deleted_at IS NULL')->orderBy('created_at', 'DESC')->findAll($limit);
+}
 }

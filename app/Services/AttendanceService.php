@@ -560,4 +560,53 @@ class AttendanceService
     {
         return (new \App\Models\UserModel)->find($adminId)['role'] === 'admin';
     }
+
+
+    public function getTodayAttendanceRate(): float
+    {
+        $today = date('Y-m-d');
+        $this->classSessionModel ??= new ClassSessionModel();
+        $sessionsToday = $this->classSessionModel->where('DATE(open_datetime)', $today)->where('status', 'marked')->findAll();
+        $totalExpected = 0;
+        $totalPresent = 0;
+        foreach ($sessionsToday as $session) {
+            $studentsInClass = (new \App\Models\StudentAssignmentModel())->where('class_id', $session['class_id'])->countAllResults();
+            $presentInSession = $this->attendanceModel->where('class_session_id', $session['class_session_id'])->where('status', 'present')->countAllResults();
+            $totalExpected += $studentsInClass;
+            $totalPresent += $presentInSession;
+        }
+        return $totalExpected == 0 ? 0.0 : round(($totalPresent / $totalExpected) * 100, 2);
+    }
+
+    public function getAttendance(): array
+    {
+        return $this->attendanceModel->where('deleted_at IS NULL')->findAll();
+    }
+
+    public function createAttendance(array $data): int
+    {
+        $validation = \Config\Services::validation();
+        $rules = [
+            'user_id' => 'required|is_natural_no_zero',
+            'class_session_id' => 'required|is_natural_no_zero',
+            'status' => 'required|in_list[present,absent,late,excused]'
+        ];
+        if (!$validation->setRules($rules)->run($data)) {
+            throw new \CodeIgniter\Validation\Exceptions\ValidationException(implode(', ', $validation->getErrors()));
+        }
+        $data['is_manual'] = 1;
+        $data['marked_at'] = date('Y-m-d H:i:s');
+        $this->attendanceModel->insert($data);
+        return $this->attendanceModel->insertID();
+    }
+
+    public function updateAttendance(int $attendanceId, array $data): bool
+    {
+        return $this->attendanceModel->update($attendanceId, $data);
+    }
+
+    public function deleteAttendance(int $attendanceId): bool
+    {
+        return $this->attendanceModel->delete($attendanceId);
+    }
 }

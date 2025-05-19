@@ -78,7 +78,7 @@ class UserService
     {
 
         $user = $this->userModel
-            ->select('user_id, user_key, first_name, last_name, middle_name, birthday, gender, bio, profile_picture')
+            ->select('user_id, user_key, first_name, last_name, middle_name, birthday, gender, bio, profile_picture, role, status')
             ->where('user_id', $userId)
             ->where('deleted_at IS NULL')
             ->first();
@@ -115,7 +115,7 @@ class UserService
             ->findAll();
     }
 
-    
+
 
     public function updateProfile(int $userId, array $userData): bool
     {
@@ -394,5 +394,58 @@ class UserService
             ->where('is_read', 0)
             ->where('deleted_at IS NULL')
             ->countAllResults();
+    }
+
+    public function countByRole(string $role): int
+    {
+        return $this->userModel->where('role', $role)->where('deleted_at IS NULL')->countAllResults();
+    }
+
+    public function getUsers(): array
+    {
+        return $this->userModel->where('deleted_at IS NULL')->findAll();
+    }
+
+    public function createUser(array $data): int
+    {
+        $validation = \Config\Services::validation();
+        $rules = [
+            'user_key' => 'required|is_unique[user.user_key]',
+            'first_name' => 'required',
+            'last_name' => 'required',
+            'role' => 'required|in_list[student,teacher,admin]',
+            'password' => 'required|min_length[8]',
+        ];
+        if (!$validation->setRules($rules)->run($data)) {
+            throw new \CodeIgniter\Validation\Exceptions\ValidationException(implode(', ', $validation->getErrors()));
+        }
+        $data['password_hash'] = password_hash($data['password'], PASSWORD_DEFAULT);
+        $data['status'] = $data['status'] ?? 'active';
+        unset($data['password']);
+        $this->userModel->insert($data);
+        return $this->userModel->insertID();
+    }
+
+    public function updateUser(int $userId, array $data): bool
+    {
+        $user = $this->userModel->where('user_id', $userId)->where('deleted_at IS NULL')->first();
+        if (!$user) {
+            throw new \CodeIgniter\Validation\Exceptions\ValidationException('User not found.');
+        }
+        if (isset($data['password'])) {
+            $data['password_hash'] = password_hash($data['password'], PASSWORD_DEFAULT);
+            unset($data['password']);
+        }
+        return $this->userModel->update($userId, $data);
+    }
+
+    public function getStudents(): array
+    {
+        return $this->getUsersByRole('student');
+    }
+
+    public function getTeachers(): array
+    {
+        return $this->getUsersByRole('teacher');
     }
 }

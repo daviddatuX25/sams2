@@ -29,19 +29,37 @@ class AdminController extends BaseController
         parent::initController($request, $response, $logger);
     }
 
-    /**
-     * Check if the current user is an admin.
-     */
-    protected function isAdmin(): bool
+    public function dashboard()
     {
-        $role = session()->get('role');
-        return $role === 'admin';
+        return $this->handleAction(function () {
+            $userService = new UserService();
+            $classService = new ClassService();
+            $leaveService = new \App\Services\AttendanceLeaveService();
+            $attendanceService = new AttendanceService();
+            $data = [
+                'stats' => [
+                    'admins' => $userService->countByRole('admin'),
+                    'teachers' => $userService->countByRole('teacher'),
+                    'students' => $userService->countByRole('student'),
+                    'active_classes' => $classService->countActive(),
+                    'pending_leaves' => $leaveService->countPending(),
+                    'pending_sessions' => (new ClassSessionService())->countPending(),
+                    'attendance_rate' => $attendanceService->getTodayAttendanceRate()
+                ],
+                'recent_leaves' => $leaveService->getRecent(),
+                'navbar' => 'admin',
+                'currentSegment' => 'dashboard',
+                'validation' => \Config\Services::validation()
+            ];
+            return view('admin/dashboard', $data);
+        });
     }
+
 
     /**
      * Users view: Manage user records.
      */
-    public function users()
+    public function users($userId = null)
     {
         return $this->handleAction(function () {
 
@@ -52,11 +70,13 @@ class AdminController extends BaseController
                 $postData = $this->request->getPost();
                 $action = $postData['action'] ?? '';
 
-                if ($this->request->isAJAX()) {
-                    $result = ['success' => false, 'message' => 'Invalid action', 'errors' => []];
-                }
-
-                if ($action === 'create') {
+                // if ($this->request->isAJAX()) {
+                //     $result = ['success' => false, 'message' => 'Invalid action', 'errors' => []];
+                // }
+                if ($action === 'get') {
+                    $userData = $userService->getUser($postData['user_id']);
+                    return $this->response->setJSON(['success' => true, 'message' => 'Successfully retrieved user data', 'data' => $userData]);
+                } elseif ($action === 'create') {
                     $userService->createUser($postData);
                     $message = 'User created successfully.';
                     if ($this->request->isAJAX()) {
@@ -87,7 +107,6 @@ class AdminController extends BaseController
                     throw new \CodeIgniter\Validation\Exceptions\ValidationException('Invalid action.');
                 }
             }
-
             $data = [
                 'users' => $userService->getUsers(),
                 'navbar' => 'admin',
@@ -219,11 +238,21 @@ class AdminController extends BaseController
     /**
      * Enrollment Terms view: Manage enrollment term records.
      */
-    public function enrollmentTerms()
+    public function enrollmentTerms($enrollmentTermId = null, $action = null)
     {
-        return $this->handleAction(function () {
+        return $this->handleAction(function () 
+        use($enrollmentTermId, $action)
+        {
 
             $enrollmentTermService = new EnrollmentTermService();
+            
+            if ($this->request->getMethod() === 'GET' && $action === 'get'){
+                $data = $enrollmentTermService->getTerm($enrollmentTermId);
+                $message = 'Enrollment term fetched successfully.';
+                if ($this->request->isAJAX()) {
+                    return $this->response->setJSON(['success' => true, 'message' => $message, 'data' => $data]);
+                }
+            } else
 
             if ($this->request->getMethod() === 'POST') {
                 $postData = $this->request->getPost();
@@ -325,11 +354,14 @@ class AdminController extends BaseController
             }
 
             $data = [
-                'assignments' => $studentAssignmentService->getAssignments(),
-                'navbar' => 'admin',
-                'currentSegment' => 'student-assignments',
-                'validation' => \Config\Services::validation()
-            ];
+            'assignments' => $studentAssignmentService->getAssignments(),
+            'students' => (new UserService())->getStudents(),
+            'classes' => (new ClassService())->getClasses(),
+            'terms' => (new EnrollmentTermService())->getTerms(),
+            'navbar' => 'admin',
+            'currentSegment' => 'student-assignments',
+            'validation' => \Config\Services::validation()
+        ];
             return view('admin/student_assignments', $data);
         });
     }
@@ -385,6 +417,9 @@ class AdminController extends BaseController
 
             $data = [
                 'assignments' => $teacherAssignmentService->getAssignments(),
+                'teachers' => (new UserService())->getTeachers(),
+                'classes' => (new ClassService())->getClasses(),
+                'terms' => (new EnrollmentTermService())->getTerms(),
                 'navbar' => 'admin',
                 'currentSegment' => 'teacher-assignments',
                 'validation' => \Config\Services::validation()
@@ -618,9 +653,13 @@ class AdminController extends BaseController
                     throw new \CodeIgniter\Validation\Exceptions\ValidationException('Invalid action.');
                 }
             }
-
             $data = [
                 'sessions' => $classSessionService->getSessions(),
+                'classes' => (new ClassService())->getClasses(),
+                'stats' => [
+                    'attendance_rate' => (new AttendanceService())->getTodayAttendanceRate(),
+                    'open_sessions' => $classSessionService->countOpen()
+                ],
                 'navbar' => 'admin',
                 'currentSegment' => 'class-sessions',
                 'validation' => \Config\Services::validation()
@@ -747,6 +786,13 @@ class AdminController extends BaseController
 
             $data = [
                 'attendance' => $attendanceService->getAttendance(),
+                'stats' => [
+                    'attendance_rate' => $attendanceService->getTodayAttendanceRate(),
+                    'open_sessions' => (new ClassSessionService())->countOpen()
+                ],
+                'classes' => (new ClassService())->getClasses(),
+                'sessions' => (new ClassSessionService())->getSessions(),
+                'students' => (new UserService())->getStudents(),
                 'navbar' => 'admin',
                 'currentSegment' => 'attendance',
                 'validation' => \Config\Services::validation()
